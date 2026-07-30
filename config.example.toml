@@ -1,0 +1,112 @@
+# Copy to config/config.toml (gitignored) and edit.
+# Secrets go in environment variables only — never here.
+#   VHFWATCH_PUSHOVER_TOKEN, VHFWATCH_PUSHOVER_USER,
+#   VHFWATCH_ANTHROPIC_API_KEY, VHFWATCH_DEEPGRAM_API_KEY
+
+# PER-MACHINE FILE — gitignored. Calibration values do NOT transfer between
+# rigs; they are properties of one radio + cable + interface + knob position.
+# See docs/DECISIONS.md D11.
+
+[general]
+channel        = "16"          # label only; the radio is tuned by hand
+site_name      = "poc-desk"
+local_timezone = "America/Los_Angeles"   # display only; DB is UTC
+data_dir       = "data"
+
+[audio]
+source            = "live"     # "live" | "file" | "directory"
+# PER-MACHINE. Andy: "M2".  Parker: "UCA202" (or "USB Audio CODEC").
+# Run scripts/audio_devices.py to see exact names.
+device            = ""         # substring match on input device name; "" = system default
+input_channels    = 2          # both interfaces present 2 in
+use_channel       = 0          # NEVER average channels — mixing with a silent
+                               # channel costs 6 dB and breaks VAD calibration
+input_gain_db     = 0.0        # post-capture digital gain. Last resort for rigs
+                               # with no hardware trim (UCA202). Can fix "too
+                               # quiet"; CANNOT fix clipping. Solve level in the
+                               # analog domain first.
+capture_rate      = 48000      # native device rate (set in Audio MIDI Setup)
+target_rate       = 16000      # everything downstream
+blocksize         = 1024
+
+# Run scripts/calibrate.py to measure these. Do not guess.
+[audio.calibration]
+noise_floor_dbfs  = -45.0      # measured with squelch OPEN
+drift_warn_db     = 6.0        # warn if noise floor moves more than this
+
+[segmenter]
+frame_ms           = 20
+open_threshold_db  = -42       # ≈ noise_floor + 10 dB (squelch closed)
+close_threshold_db = -48       # hysteresis: must be lower than open
+open_frames        = 2         # 40 ms above threshold to open
+hang_ms            = 800       # below threshold before closing
+preroll_ms         = 300       # MANDATORY — squelch clips first syllables
+min_duration_ms    = 600       # discard shorter
+max_duration_ms    = 120000    # force close a stuck transmitter
+clip_warn_dbfs     = -0.5
+
+[asr]
+engine        = "mlx"          # "mlx" (Apple Silicon) | "faster_whisper" | "deepgram"
+model         = "small.en"
+temperature   = 0.0            # determinism for tuning runs
+beam_size     = 5
+condition_on_previous_text = false   # stops hallucination loops
+no_speech_threshold        = 0.6
+logprob_threshold          = -1.0
+initial_prompt = """Marine VHF radio traffic on channel 16. Mayday, pan-pan, \
+securite, Coast Guard, vessel, motor vessel, sailing vessel, position, \
+latitude, longitude, persons on board, taking on water, man overboard, \
+abandoning ship, over, out, standing by, radio check."""
+
+[hallucination]
+min_snr_db          = 3.0      # skip ASR below this
+max_repeat_tokens   = 3        # same token repeated more than this = reject
+blocklist = [
+  "thank you for watching", "thanks for watching", "please subscribe",
+  "subtitles by", "amara.org", "transcription by",
+  "[music]", "[applause]", "[inaudible]",
+]
+
+[detect]
+fuzzy_min_ratio       = 0.82
+llm_min_words         = 8      # classify longer transcripts even with no match
+llm_timeout_s         = 5.0
+llm_model             = "claude-haiku-4-5-20251001"
+llm_context_count     = 3      # preceding transmissions passed as context
+
+[correlator]
+quiet_period_s          = 300  # no activity → close incident
+vessel_match_ratio      = 0.80
+max_incident_duration_s = 3600
+
+[alerting]
+channels_critical = ["console", "macos", "pushover"]
+channels_urgent   = ["console", "macos", "pushover"]
+channels_watch    = ["console"]
+channels_routine  = []
+escalate_after_s  = 60         # no ack → escalate
+dedupe_window_s   = 300
+
+[alerting.pushover]
+priority_critical = 2          # emergency: bypasses DND, re-alerts until acked
+priority_urgent   = 1
+retry_s           = 60
+expire_s          = 1800
+
+[web]
+host        = "127.0.0.1"
+port        = 8080
+base_url    = "http://127.0.0.1:8080"   # used to build alert deep links
+token_ttl_days = 365
+
+[storage]
+archive_codec      = "opus"    # archival
+archive_bitrate    = "24k"
+playback_codec     = "aac"     # generated at ingest — iOS Safari compatibility
+retention_days     = 90        # 0 = keep forever; set deliberately
+
+[health]
+no_audio_alert_hours = 6       # total silence on Ch 16 means something broke
+heartbeat_timeout_s  = 120
+self_test_hour       = 9       # local hour for daily end-to-end test
+min_free_disk_gb     = 5

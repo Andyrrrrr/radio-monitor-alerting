@@ -1,0 +1,78 @@
+# Copy to config/watchwords.toml. Fully user-editable — this is the file
+# Parker should be able to tune without touching code.
+#
+# Matching is normalized (lowercase, punctuation stripped), then exact,
+# then Double Metaphone phonetic, then bounded fuzzy. So "may day",
+# "mated", and "MAYDAY!" all match "mayday" without listing variants.
+#
+# Add terms you actually hear in local traffic. Remove ones that prove noisy.
+# Every change should be validated with scripts/evaluate.py against the corpus.
+
+[critical]
+# Explicit distress. Wakes people up.
+terms = [
+  "mayday",
+  "may day",
+  "mayday relay",
+  "abandoning ship",
+  "abandon ship",
+  "vessel sinking",
+  "we are sinking",
+  "we're sinking",
+  "going down",
+]
+
+[urgent]
+# Urgency traffic and distress semantics without the magic word.
+terms = [
+  "pan pan",
+  "pan-pan",
+  "man overboard",
+  "person in the water",
+  "people in the water",
+  "taking on water",
+  "vessel on fire",
+  "boat on fire",
+  "smoke aboard",
+  "flooding",
+  "engine room fire",
+  "capsized",
+  "rolled over",
+  "collision",
+  "collided",
+  "medical emergency",
+  "not breathing",
+  "unconscious",
+  "cpr",
+  "severe bleeding",
+  "coast guard coast guard coast guard",
+]
+
+[watch]
+# Might escalate. Logged, shown in the feed, no notification by default.
+terms = [
+  "require assistance",
+  "requesting assistance",
+  "need help",
+  "need assistance",
+  "aground",
+  "run aground",
+  "dead in the water",
+  "engine failure",
+  "lost power",
+  "adrift",
+  "out of fuel",
+  "securite",
+  "taking on some water",
+  "lost steering",
+]
+
+# Phrases that look like hits but are routine traffic. Suppresses a match
+# when one of these is present and no critical term is. Start empty and
+# populate from observed false positives — do not guess.
+[suppress]
+terms = [
+  "radio check",
+  "this is a test",
+  "test test test",
+]
