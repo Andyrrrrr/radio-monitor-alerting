@@ -5,7 +5,7 @@
 
 # PER-MACHINE FILE — gitignored. Calibration values do NOT transfer between
 # rigs; they are properties of one radio + cable + interface + knob position.
-# See docs/DECISIONS.md D11.
+# See docs/decisions.md D11.
 
 [general]
 channel        = "16"          # label only; the radio is tuned by hand

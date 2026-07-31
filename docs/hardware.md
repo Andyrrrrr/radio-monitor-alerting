@@ -21,8 +21,8 @@ Development happens on two different audio front-ends. **This is supported delib
 
 **Consequences that matter for code and process:**
 
-1. **`config/config.toml` is per-machine and gitignored.** Device name, thresholds, and gain differ between rigs. Never commit it. `config.example.toml` is the shared template.
-2. **Calibration values do not transfer between rigs.** Noise floor, `open_threshold_db`, and gain settings are properties of one specific radio + cable + interface + volume-knob position. Each person calibrates their own and records it in `docs/BRINGUP_LOG.md` under their own heading.
+1. **`config/config.toml` is per-machine and gitignored.** Device name, thresholds, and gain differ between rigs. Never commit it. `config/config.example.toml` is the shared template.
+2. **Calibration values do not transfer between rigs.** Noise floor, `open_threshold_db`, and gain settings are properties of one specific radio + cable + interface + volume-knob position. Each person calibrates their own and records it in `docs/bringup-log.md` under their own heading.
 3. **Corpus audio is rig-specific in level and noise character but still shareable and worth sharing.** A corpus recorded on the M2 rig is perfectly good for developing and testing the segmenter, ASR, and detector. It is *not* a substitute for calibrating thresholds on the other rig. Share corpus freely; re-derive thresholds locally.
 4. **Test on both before trusting a segmenter change.** A threshold tweak that improves things on one rig can regress the other.
 
@@ -160,7 +160,7 @@ Both interfaces present as **2-in devices**. Depending on the cable and the radi
 
 ### 3.8 Rejected: Bluetooth
 
-Parker's radio has Bluetooth. It is not a viable audio path. Recorded here so it doesn't get revisited — see `docs/DECISIONS.md` for the full reasoning. Summary: macOS cannot act as a Bluetooth audio sink, and headset audio profiles apply AGC, noise suppression, and VAD that would actively break the segmentation design.
+Parker's radio has Bluetooth. It is not a viable audio path. Recorded here so it doesn't get revisited — see `docs/decisions.md` for the full reasoning. Summary: macOS cannot act as a Bluetooth audio sink, and headset audio profiles apply AGC, noise suppression, and VAD that would actively break the segmentation design.
 
 ---
 
@@ -179,7 +179,7 @@ Long-term priority order: **antenna height and quality first, feedline second, r
 
 ## 5. Bring-up verification procedure
 
-In order. Each step isolates one link. Don't skip ahead — the point is knowing *which* link is broken. Log results in `docs/BRINGUP_LOG.md`.
+In order. Each step isolates one link. Don't skip ahead — the point is knowing *which* link is broken. Log results in `docs/bringup-log.md`.
 
 **Step 1 — Radio hears traffic (no computer).**
 Park on Ch 16, listen by speaker or earphone during a busy period — daytime, good weather, active harbor. Expect radio checks, hails, USCG broadcasts.
@@ -223,7 +223,7 @@ Replay recorded audio through the file source, or use the M2's loopback. **Never
 
 ## 6. You are not blocked on hardware
 
-**Phases 0 and 1 need no audio hardware at all.** The audio source is an interface with a file backend (`docs/ARCHITECTURE.md` §5.1), so the segmenter, ASR, detector, correlator, and store all build and test against WAV files.
+**Phases 0 and 1 need no audio hardware at all.** The audio source is an interface with a file backend (`docs/architecture.md` §5.1), so the segmenter, ASR, detector, correlator, and store all build and test against WAV files.
 
 - **Parker can develop against Andy's corpus** while parts ship. Recording rig differs; the code doesn't care.
 - If you want real audio before the interface arrives, the **Mac's built-in mic pointed at the radio speaker** exercises the whole live path. Caveat: macOS applies voice processing (AGC, noise suppression) to built-in mic capture in some modes — the same problems that rule out Bluetooth. Use it for building and testing, **never for calibrating thresholds.** Any numbers derived from built-in-mic audio must be redone once the wire is in.
@@ -238,6 +238,6 @@ If the POC proves out, in value order:
 1. **Externally mounted antenna, as high as possible**, low-loss coax, lightning arrestor, proper grounding. Dominates everything else.
 2. **Dedicated fixed-mount receiver** parked on 16 permanently, so nobody retunes the operational radio.
 3. **Shore/station install on mains power with a UPS.** A dead handheld battery is a silent failure.
-4. **x86 mini PC** (Intel N100-class) as permanent host. The code must run there — see `CLAUDE.md` § Platform notes.
+4. **x86 mini PC** (Intel N100-class) as permanent host. The code must run there — see `docs/conventions.md` §5.
 5. **Second receiver on 22A**, where USCG moves traffic after initial contact.
 6. **SDR** — whole marine band at once, RSSI-based gating, plus DSC and AIS as supplements. Voice must still stand alone.

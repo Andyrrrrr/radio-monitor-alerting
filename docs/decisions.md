@@ -128,7 +128,7 @@ Settled questions with reasoning, so they don't get relitigated mid-build. If yo
 **Why:** it's what each person has. Also a useful forcing function — it keeps device-specific assumptions out of the pipeline.
 
 **Consequences:**
-- `config/config.toml` is per-machine and gitignored; `config.example.toml` is the shared template.
+- `config/config.toml` is per-machine and gitignored; `config/config.example.toml` is the shared template.
 - **Calibration values do not transfer.** Noise floor and thresholds are properties of one radio + cable + interface + knob position.
 - **Corpus audio is shareable** for developing and testing segmentation, ASR, and detection — but not for deriving the other rig's thresholds.
 - Segmenter changes should be checked against both rigs' audio.

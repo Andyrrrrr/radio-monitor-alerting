@@ -1,4 +1,4 @@
-# Copy to config/watchwords.toml. Fully user-editable — this is the file
+# Copy to config/watchwords.toml (gitignored). Fully user-editable — this is the file
 # Parker should be able to tune without touching code.
 #
 # Matching is normalized (lowercase, punctuation stripped), then exact,

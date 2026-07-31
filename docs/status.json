@@ -1,0 +1,83 @@
+{
+  "_readme": "Machine-readable project status. Read this at the start of a session to orient; update it at the end of any task that changes what's built or what's broken. Prose belongs in the docs — this file is the ledger. Status values: not_started | in_progress | complete | blocked.",
+  "last_updated": "2026-07-30",
+  "current_phase": "Phase 0 — skeleton and file-based pipeline",
+  "phases": {
+    "phase_0_skeleton": {
+      "status": "not_started",
+      "hardware_required": false,
+      "notes": "Package skeleton, models.py, config loading, SQLite store, FileAudioSource, segmenter, segmenter tests. Exit criterion: the pipeline segments a WAV into transmissions in SQLite with audio on disk, and the four required segmenter fixture cases pass. See docs/roadmap.md."
+    },
+    "phase_1_transcription_detection": {
+      "status": "not_started",
+      "hardware_required": false,
+      "notes": "ASR implementations, hallucination filter, watchwords, LLM classification, correlator, evaluate.py. This is the phase that determines whether the project is viable — if precision is unusable here, no amount of later polish fixes it."
+    },
+    "phase_2_live_audio": {
+      "status": "blocked",
+      "hardware_required": true,
+      "notes": "Blocked on hardware bring-up, not on code. Do not start debugging software against live audio before docs/hardware.md §5 Step 4 passes."
+    },
+    "phase_3_alerting_and_record": {
+      "status": "not_started",
+      "hardware_required": false,
+      "notes": "Alert channels, router, FastAPI incident record, waveform UI, useful/not-useful feedback."
+    },
+    "phase_4_reliability": {
+      "status": "not_started",
+      "hardware_required": true,
+      "notes": "Watchdog, heartbeats, no-transmission alert, noise-floor drift, daily self-test, systemd units, x86 Linux verification."
+    },
+    "phase_5_tuning": {
+      "status": "not_started",
+      "hardware_required": true,
+      "notes": "Incident review with Parker, threshold retuning against real feedback labels, lead-time statistics."
+    }
+  },
+  "parallel_tracks": {
+    "corpus_collection": {
+      "status": "not_started",
+      "notes": "Real Ch 16 audio accumulates in wall-clock time and cannot be rushed later. Start recording as soon as ANY audio input works — this is the highest-value thing that can be happening in the background at all times. Corpus is shareable between rigs; calibration values are not (docs/decisions.md D11)."
+    },
+    "bringup_log": {
+      "status": "not_started",
+      "notes": "docs/bringup-log.md is an empty template. No session has been recorded for either rig."
+    }
+  },
+  "rigs": {
+    "andy_m2": {
+      "interface": "MOTU M2",
+      "audio_chain_verified": false,
+      "calibrated": false,
+      "noise_floor_dbfs": null,
+      "open_threshold_db": null,
+      "notes": "Has a hardware input trim. Watch for the balanced-input phase-cancellation trap (docs/hardware.md §3.4)."
+    },
+    "parker_uca202": {
+      "interface": "Behringer UCA202",
+      "audio_chain_verified": false,
+      "calibrated": false,
+      "noise_floor_dbfs": null,
+      "open_threshold_db": null,
+      "notes": "No hardware input trim — the front knob is headphone output only. The radio's volume knob may be the only analog control, with input_gain_db as a post-capture last resort."
+    }
+  },
+  "known_issues": [
+    {
+      "description": "No code exists yet. The repository is documentation only — no pyproject.toml, no src/vhfwatch/, no tests/. Every interface and parameter value in docs/architecture.md is a specification, not a description of something that runs.",
+      "severity": "informational"
+    },
+    {
+      "description": "Neither rig's audio chain has been verified end to end. The bring-up procedure in docs/hardware.md §5 has not been run, so all segmenter thresholds in docs/architecture.md §5.2 are starting guesses derived from theory, not from a measured noise floor.",
+      "severity": "medium"
+    },
+    {
+      "description": "ASR model choice (base.en / small.en / medium.en) is unresolved. docs/architecture.md says start with small.en, but the decision is supposed to be made on measured WER against the real corpus, and the corpus does not exist yet.",
+      "severity": "low"
+    }
+  ],
+  "verified_on_hardware": [],
+  "open_questions": [
+    "What is the actual traffic volume on Ch 16 at the POC site? This sets the 'no transmission in N hours' watchdog threshold (Phase 4 starts at 6 hours as a placeholder) and determines whether closed-squelch VAD is leaving too much on the table."
+  ]
+}
