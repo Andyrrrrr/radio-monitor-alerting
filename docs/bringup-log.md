@@ -46,10 +46,10 @@ Template below — copy the block for each session.
 | Noise floor, squelch open (dBFS) | |
 | Speech peak, typical (dBFS) | |
 | Clipping observed? | |
-| Phase cancellation ruled out? (M2 rig) | (see HARDWARE §3.4) |
+| Phase cancellation ruled out? (M2 rig) | (see `docs/hardware.md` §3.4) |
 | `open_threshold_db` set to | |
 
-### Verification steps (`docs/HARDWARE.md` §5)
+### Verification steps (`docs/hardware.md` §5)
 
 | Step | Result | Notes |
 |---|---|---|

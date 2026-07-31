@@ -4,23 +4,23 @@ Ordered milestones with exit criteria. Work top to bottom. Each phase produces s
 
 **Two things run in parallel with everything else, starting today:**
 
-- **Corpus collection.** Real Ch 16 audio accumulates in wall-clock time and cannot be rushed later. Get `record_corpus.py` working and start recording as soon as *any* audio input works. The corpus is what every tuning decision depends on. **Share it between rigs** — whoever has working audio first unblocks the other person's Phase 1 work. (Corpus transfers; calibration values don't. See `docs/DECISIONS.md` D11.)
-- **`docs/BRINGUP_LOG.md`.** Date-stamped entries for hardware settings, calibration values, and what worked. When something breaks in three weeks, this is how you find out what changed.
+- **Corpus collection.** Real Ch 16 audio accumulates in wall-clock time and cannot be rushed later. Get `record_corpus.py` working and start recording as soon as *any* audio input works. The corpus is what every tuning decision depends on. **Share it between rigs** — whoever has working audio first unblocks the other person's Phase 1 work. (Corpus transfers; calibration values don't. See `docs/decisions.md` D11.)
+- **`docs/bringup-log.md`.** Date-stamped entries for hardware settings, calibration values, and what worked. When something breaks in three weeks, this is how you find out what changed.
 
 ---
 
 ## Phase 0 — Skeleton and file-based pipeline
 
-**No hardware required.** Everything here runs against WAV files. If the audio chain isn't working yet (see `docs/HARDWARE.md` §1), this is a full day of productive work.
+**No hardware required.** Everything here runs against WAV files. If the audio chain isn't working yet (see `docs/hardware.md` §1), this is a full day of productive work.
 
 - [ ] `pyproject.toml` with `[dev]`, `[macos]`, `[linux]` extras; `uv` for env management
-- [ ] `src/vhfwatch/models.py` — all core dataclasses from `docs/ARCHITECTURE.md` §4
-- [ ] `config.py` — `pydantic-settings`, TOML + env override; `config.example.toml` and `watchwords.example.toml`
-- [ ] `.gitignore` — **`data/`, `config/config.toml`, `*.wav`, `*.db` first**
+- [ ] `src/vhfwatch/models.py` — all core dataclasses from `docs/architecture.md` §4
+- [ ] `config.py` — `pydantic-settings`, TOML + env override; `config/config.example.toml` and `config/watchwords.example.toml`
+- [x] `.gitignore` — **`data/`, `config/config.toml`, `*.wav`, `*.db` first**
 - [ ] `store/schema.sql` + `store/db.py` — SQLite WAL, migrations, all tables
 - [ ] `audio/sources.py` — `AudioSource` Protocol + `FileAudioSource`
 - [ ] `audio/segmenter.py` — RMS gate, hysteresis, hang time, pre-roll ring buffer, min/max duration
-- [ ] Segmenter unit tests with synthesized fixtures — the four required cases in `CLAUDE.md`
+- [ ] Segmenter unit tests with synthesized fixtures — the four required cases in `docs/conventions.md` §6
 - [ ] `structlog` configured; `scripts/audio_devices.py`
 
 **Exit:** `python -m vhfwatch.pipeline --source file --path tests/fixtures/sample.wav` segments a WAV into transmissions, writes them to SQLite with audio files on disk, and the segmenter tests pass.
@@ -48,7 +48,7 @@ Still no hardware. This is where accuracy gets established.
 
 ## Phase 2 — Live audio
 
-Hardware enters. Work through the verification procedure in `docs/HARDWARE.md` §5 — don't debug software before Step 4 passes.
+Hardware enters. Work through the verification procedure in `docs/hardware.md` §5 — don't debug software before Step 4 passes.
 
 - [ ] `LiveAudioSource` via `sounddevice`, surviving device disconnect/reconnect without killing the process
 - [ ] Channel selection via `use_channel` — slice, never average
@@ -72,7 +72,7 @@ Now it becomes usable by a person.
 - [ ] `alerting/router.py` — severity routing, alert-once-then-update-in-place, escalation on no-ack, dedupe
 - [ ] **Notification body fully actionable with zero connectivity** — severity, time, vessel, nature, position, verbatim quote in the message itself
 - [ ] Signed per-recipient access tokens; store hashes, log access
-- [ ] `web/app.py` FastAPI, **separate process**, all routes from `docs/ARCHITECTURE.md` §5.10
+- [ ] `web/app.py` FastAPI, **separate process**, all routes from `docs/architecture.md` §5.10
 - [ ] Incident page in priority order: status line → latest transmission one-tap playable → full transcript with synced audio → summary adjacent to transcript → ack + feedback
 - [ ] `wavesurfer.js` waveform, click-to-seek, matched watchwords marked
 - [ ] **Uncertainty rendered honestly** — low-confidence words greyed, signal-strength glyph, which tier fired, count of dropped segments
@@ -122,7 +122,7 @@ The phase that actually determines whether people keep it running.
 
 Roughly in value order:
 
-1. **Better antenna, mounted high.** Beats every software change available. See `docs/HARDWARE.md` §4.
+1. **Better antenna, mounted high.** Beats every software change available. See `docs/hardware.md` §4.
 2. **Fixed-mount receiver + mains power + UPS** on a permanent x86 host.
 3. **Second receiver on 22A**, where USCG moves traffic after initial contact.
 4. **SDR** — whole marine band at once, plus RSSI-based gating, plus DSC and AIS as supplements. Note voice must still stand alone.
@@ -137,7 +137,7 @@ Roughly in value order:
 Recorded so they don't get relitigated mid-build:
 
 - **Not** a certified or primary alerting system. Ever.
-- **No** public live feed of distress traffic (`docs/ARCHITECTURE.md` §8).
+- **No** public live feed of distress traffic (`docs/architecture.md` §8).
 - **No** SMS in the POC — 10DLC registration blocks for weeks.
 - **No** multi-channel scanning on one radio — gaps lose transmissions.
 - **No** microservices, Docker, message brokers, or user accounts.

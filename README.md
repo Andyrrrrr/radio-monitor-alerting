@@ -27,7 +27,7 @@ If this system is the only thing standing between someone in distress and a resp
 
 - **Monitoring and recording radio traffic is regulated and varies by jurisdiction.** In the US, receiving marine VHF is generally unrestricted, but *divulging* or *publishing* the contents of intercepted communications is governed by 47 U.S.C. § 605 and other law. Recording distress traffic involving identifiable people and vessels raises privacy questions. **None of this is legal advice.** Understand your local law before operating this.
 - **Do not transmit.** This is a receive-only application. If you are using a land mobile radio to monitor marine channels, program those channels as receive-only. Transmitting on marine VHF without appropriate authorization is illegal, and transmitting over distress traffic is dangerous.
-- **Do not publish a live feed of distress traffic.** Beyond the privacy problem, a real-time public list of vessels in trouble with positions attached is a target list for opportunistic salvage and draws spectators and unqualified vessels toward active scenes. See `docs/ARCHITECTURE.md` § Sharing.
+- **Do not publish a live feed of distress traffic.** Beyond the privacy problem, a real-time public list of vessels in trouble with positions attached is a target list for opportunistic salvage and draws spectators and unqualified vessels toward active scenes. See `docs/architecture.md` § Sharing.
 - **Never commit recordings of real radio traffic to this repository.** `data/` is gitignored. Keep it that way.
 - If you work for an agency, **get your own organization's approval before operating this**, and do not let it become an official notification path without that approval in writing.
 
@@ -63,18 +63,22 @@ Voice is the only signal this project relies on. DSC and AIS are richer and more
 - A VHF receiver with an audio output, and a way to get that audio into a computer
 - macOS (Apple Silicon or Intel) or Linux x86-64
 
-POC hardware: Kenwood NX-5200 (already programmed with marine channels) → multi-pin→K1 audio adapter → a line-level USB audio interface (Behringer UCA202 or MOTU M2) → MacBook Pro. See `docs/HARDWARE.md` for cable specs per rig, level calibration, and a bring-up procedure that isolates each link in the chain.
+POC hardware: Kenwood NX-5200 (already programmed with marine channels) → multi-pin→K1 audio adapter → a line-level USB audio interface (Behringer UCA202 or MOTU M2) → MacBook Pro. See `docs/hardware.md` for cable specs per rig, level calibration, and a bring-up procedure that isolates each link in the chain.
 
 ## Documentation
 
 | Doc | Contents |
 |---|---|
-| `CLAUDE.md` | Working context and conventions for Claude Code |
-| `docs/HARDWARE.md` | Radio programming, audio chain, calibration, verification |
-| `docs/ARCHITECTURE.md` | Module layout, interfaces, data model, design decisions |
-| `docs/ROADMAP.md` | Phased milestones with exit criteria |
-| `docs/DECISIONS.md` | Settled decisions and their reasoning |
-| `docs/BRINGUP_LOG.md` | Per-rig hardware settings and verification results |
+| `AGENTS.md` | Working context for coding agents — the map to everything below. `CLAUDE.md` just points here |
+| `docs/architecture.md` | Module layout, interfaces, data model, design decisions |
+| `docs/roadmap.md` | Phased milestones with exit criteria |
+| `docs/decisions.md` | Settled decisions and their reasoning |
+| `docs/conventions.md` | Code conventions, platform rules, testing expectations |
+| `docs/definition-of-done.md` | The checklist a change has to pass before it counts as finished |
+| `docs/hardware.md` | Radio programming, audio chain, calibration, verification |
+| `docs/bringup-log.md` | Per-rig hardware settings and verification results |
+| `docs/status.json` | What's built, what isn't, what's known broken |
+| `docs/plans/` | Written plans for larger pieces of work |
 
 ## License
 

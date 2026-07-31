@@ -24,7 +24,8 @@ These drive everything below. When a decision looks arbitrary, check here first.
 
 ```
 vhf-watch/
-├── CLAUDE.md
+├── AGENTS.md                    # working context for coding agents
+├── CLAUDE.md                    # one line: @AGENTS.md
 ├── README.md
 ├── pyproject.toml
 ├── config/
@@ -35,10 +36,15 @@ vhf-watch/
 │   ├── corpus/
 │   └── vhfwatch.db
 ├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── HARDWARE.md
-│   ├── ROADMAP.md
-│   └── BRINGUP_LOG.md
+│   ├── architecture.md          # this file
+│   ├── roadmap.md
+│   ├── decisions.md
+│   ├── conventions.md
+│   ├── definition-of-done.md
+│   ├── hardware.md
+│   ├── bringup-log.md
+│   ├── status.json
+│   └── plans/
 ├── src/vhfwatch/
 │   ├── config.py                # pydantic-settings, TOML loading
 │   ├── models.py                # shared dataclasses (see §4)
