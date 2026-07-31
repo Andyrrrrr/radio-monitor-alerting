@@ -64,6 +64,10 @@
   },
   "known_issues": [
     {
+      "description": "The clips in audio-test-samples/ (and their 16 kHz conversions in data/corpus/) were recorded from the radio's speaker through a laptop mic, NOT through the line-in chain. They are useful only as smoke-test input for the pipeline. Do not tune segmenter thresholds against them, do not treat their noise floors (-60 to -77 dBFS) as representative, and do not use them for the Phase 1 WER comparison — wait for real line-in corpus audio.",
+      "severity": "informational"
+    },
+    {
       "description": "asr/, detect/, incidents/, alerting/, health/, and web/ are still specification only. The file-based pipeline (sources, segmenter, store, entry point) is real and tested.",
       "severity": "informational"
     },
