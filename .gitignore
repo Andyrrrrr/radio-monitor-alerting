@@ -10,9 +10,14 @@
 # band — not through the repo. Test fixtures must be synthetic.
 # ---------------------------------------------------------------------------
 data/
+audio-test-samples/
 *.wav
 *.opus
 *.m4a
+*.mp4
+*.mp3
+*.aac
+*.flac
 *.db
 *.db-wal
 *.db-shm

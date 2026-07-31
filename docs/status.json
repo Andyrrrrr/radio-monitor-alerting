@@ -1,12 +1,12 @@
 {
   "_readme": "Machine-readable project status. Read this at the start of a session to orient; update it at the end of any task that changes what's built or what's broken. Prose belongs in the docs — this file is the ledger. Status values: not_started | in_progress | complete | blocked.",
   "last_updated": "2026-07-30",
-  "current_phase": "Phase 0 — skeleton and file-based pipeline",
+  "current_phase": "Phase 1 — transcription and detection, offline",
   "phases": {
     "phase_0_skeleton": {
-      "status": "in_progress",
+      "status": "complete",
       "hardware_required": false,
-      "notes": "Done: pyproject.toml, models.py, config.py (pydantic-settings, TOML + VHFWATCH_* env override), structlog setup (log.py), store/schema.sql (all 11 tables, append-only triggers) + store/db.py (WAL, user_version migrations), tests for config and store. Remaining: FileAudioSource, segmenter, the four segmenter fixture tests, scripts/audio_devices.py, pipeline entry point. Exit criterion: the pipeline segments a WAV into transmissions in SQLite with audio on disk, and the four required segmenter fixture cases pass. See docs/roadmap.md."
+      "notes": "Exit criterion verified 2026-07-30: `python -m vhfwatch.pipeline --source file --path tests/fixtures/sample.wav` segments the fixture into 2 transmissions in SQLite with WAV audio + SHA-256 on disk; all four required segmenter cases pass (tests/test_segmenter.py). Note: archival is 16-bit WAV for now (Opus/AAC lands in Phase 3, docs/decisions.md D13) and the pipeline refuses non-16 kHz files (resampling is a Phase 2 deliverable). DirectoryAudioSource also deferred to Phase 2."
     },
     "phase_1_transcription_detection": {
       "status": "not_started",
@@ -64,7 +64,7 @@
   },
   "known_issues": [
     {
-      "description": "No audio code exists yet. The skeleton (models, config, store) is real and tested, but audio/, asr/, detect/, and the pipeline entry point are still specification only.",
+      "description": "asr/, detect/, incidents/, alerting/, health/, and web/ are still specification only. The file-based pipeline (sources, segmenter, store, entry point) is real and tested.",
       "severity": "informational"
     },
     {

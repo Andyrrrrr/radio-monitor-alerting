@@ -70,6 +70,7 @@ class SegmenterConfig(_Section):
     min_duration_ms: int = 600  # discard shorter
     max_duration_ms: int = 120000  # force close a stuck transmitter
     clip_warn_dbfs: float = -0.5
+    noise_ema_alpha: float = 0.05  # noise-floor smoothing; higher = adapts faster
 
     @model_validator(mode="after")
     def _hysteresis_holds(self) -> Self:

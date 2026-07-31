@@ -142,3 +142,22 @@ Settled questions with reasoning, so they don't get relitigated mid-build. If yo
 **Why:** one mayday produces a dozen-plus transmissions over several minutes. Fifteen notifications for one event trains people to silence the app, which is worse than no system.
 
 **Consequences:** incidents stay open and accrue; alert once on open then update in place; escalate severity but never auto-de-escalate; expose manual merge/split because correlation will sometimes be wrong.
+
+---
+
+## D13 — stdlib `wave` (16-bit PCM only) for Phase 0 file I/O
+
+**Decided for Phase 0.** `FileAudioSource` and the archival writer use the
+standard library `wave` module and support only 16-bit PCM WAV, refusing
+other formats with a clear error.
+
+**Why:** everything Phase 0 touches — synthetic fixtures, the corpus
+recorder's output, the archival placeholder — is 16-bit PCM we generate
+ourselves, so `soundfile` would be a dependency with no current payoff
+(docs/conventions.md §8). The Opus/AAC archive pipeline (§5.8) needs ffmpeg
+anyway and lands in Phase 3 behind the same `archive_wav` call site.
+
+**Revisit when:** Phase 2 live capture lands (recording and resampling make
+`soundfile`/`soxr` genuinely useful), or the first time someone has a real
+24-bit or float WAV they need to replay. Add the dependency then; do not
+hand-roll 24-bit unpacking.

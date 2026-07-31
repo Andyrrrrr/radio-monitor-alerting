@@ -17,6 +17,10 @@ dependencies = [
   "pydantic-settings>=2.3",
   # python-ulid: IDs that sort chronologically (docs/conventions.md §3)
   "python-ulid>=2.2",
+  # sounddevice: PortAudio capture, used on BOTH platforms (Core Audio on
+  # macOS, ALSA on Linux) so it's a base dep, not a platform extra. macOS
+  # wheels bundle PortAudio; Linux needs libportaudio2 from the distro.
+  "sounddevice>=0.4",
   # structlog: structured key-value logging (docs/conventions.md §4)
   "structlog>=24.1",
 ]

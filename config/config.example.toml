@@ -44,6 +44,10 @@ preroll_ms         = 300       # MANDATORY — squelch clips first syllables
 min_duration_ms    = 600       # discard shorter
 max_duration_ms    = 120000    # force close a stuck transmitter
 clip_warn_dbfs     = -0.5
+noise_ema_alpha    = 0.05      # smoothing for the running noise-floor estimate
+                               # (feeds est_snr_db). 0.05 ≈ settles over ~1 s of
+                               # closed-squelch frames; raise to adapt faster at
+                               # noisier sites, lower for steadier estimates
 
 [asr]
 engine        = "mlx"          # "mlx" (Apple Silicon) | "faster_whisper" | "deepgram"

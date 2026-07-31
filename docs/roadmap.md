@@ -18,10 +18,10 @@ Ordered milestones with exit criteria. Work top to bottom. Each phase produces s
 - [x] `config.py` — `pydantic-settings`, TOML + env override; `config/config.example.toml` and `config/watchwords.example.toml`
 - [x] `.gitignore` — **`data/`, `config/config.toml`, `*.wav`, `*.db` first**
 - [x] `store/schema.sql` + `store/db.py` — SQLite WAL, migrations, all tables
-- [ ] `audio/sources.py` — `AudioSource` Protocol + `FileAudioSource`
-- [ ] `audio/segmenter.py` — RMS gate, hysteresis, hang time, pre-roll ring buffer, min/max duration
-- [ ] Segmenter unit tests with synthesized fixtures — the four required cases in `docs/conventions.md` §6
-- [ ] `structlog` configured; `scripts/audio_devices.py`
+- [x] `audio/sources.py` — `AudioSource` Protocol + `FileAudioSource`
+- [x] `audio/segmenter.py` — RMS gate, hysteresis, hang time, pre-roll ring buffer, min/max duration
+- [x] Segmenter unit tests with synthesized fixtures — the four required cases in `docs/conventions.md` §6
+- [x] `structlog` configured; `scripts/audio_devices.py`
 
 **Exit:** `python -m vhfwatch.pipeline --source file --path tests/fixtures/sample.wav` segments a WAV into transmissions, writes them to SQLite with audio files on disk, and the segmenter tests pass.
 
