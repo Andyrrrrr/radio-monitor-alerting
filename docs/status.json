@@ -4,9 +4,9 @@
   "current_phase": "Phase 0 — skeleton and file-based pipeline",
   "phases": {
     "phase_0_skeleton": {
-      "status": "not_started",
+      "status": "in_progress",
       "hardware_required": false,
-      "notes": "Package skeleton, models.py, config loading, SQLite store, FileAudioSource, segmenter, segmenter tests. Exit criterion: the pipeline segments a WAV into transmissions in SQLite with audio on disk, and the four required segmenter fixture cases pass. See docs/roadmap.md."
+      "notes": "Done: pyproject.toml, models.py, config.py (pydantic-settings, TOML + VHFWATCH_* env override), structlog setup (log.py), store/schema.sql (all 11 tables, append-only triggers) + store/db.py (WAL, user_version migrations), tests for config and store. Remaining: FileAudioSource, segmenter, the four segmenter fixture tests, scripts/audio_devices.py, pipeline entry point. Exit criterion: the pipeline segments a WAV into transmissions in SQLite with audio on disk, and the four required segmenter fixture cases pass. See docs/roadmap.md."
     },
     "phase_1_transcription_detection": {
       "status": "not_started",
@@ -64,7 +64,7 @@
   },
   "known_issues": [
     {
-      "description": "No code exists yet. The repository is documentation only — no pyproject.toml, no src/vhfwatch/, no tests/. Every interface and parameter value in docs/architecture.md is a specification, not a description of something that runs.",
+      "description": "No audio code exists yet. The skeleton (models, config, store) is real and tested, but audio/, asr/, detect/, and the pipeline entry point are still specification only.",
       "severity": "informational"
     },
     {

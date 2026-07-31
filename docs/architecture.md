@@ -437,7 +437,7 @@ SQLite, WAL mode. Schema in `store/schema.sql`, tables per the report's data mod
 
 - **Archive Opus** (16 kHz mono, ~16–24 kbps) for storage; **generate an AAC/M4A copy at ingest** for playback. Opus-in-WebM on iOS Safari has been unreliable and the crew is on iPhones. Transcode at ingest, not on demand — no transcoding in the critical path.
 - **SHA-256 every audio file at ingest**, store alongside the path.
-- **Append-only.** Corrections go in `annotation` with author and timestamp. Never `UPDATE` a transcript or summary.
+- **Append-only.** Corrections go in `annotation` with author and timestamp. Never `UPDATE` a transcript or summary. Enforced at the database layer: `schema.sql` has `BEFORE UPDATE` triggers that abort updates to `transcript`, `annotation`, and archived `transmission` rows (the one allowed transmission update is filling in `audio_path`/`audio_sha256` at archive time).
 - `transmission` and `transcript` stay separate — you will re-transcribe the archive with better models and want to compare.
 
 ### 5.9 Watchdog

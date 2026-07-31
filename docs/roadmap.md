@@ -13,11 +13,11 @@ Ordered milestones with exit criteria. Work top to bottom. Each phase produces s
 
 **No hardware required.** Everything here runs against WAV files. If the audio chain isn't working yet (see `docs/hardware.md` §1), this is a full day of productive work.
 
-- [ ] `pyproject.toml` with `[dev]`, `[macos]`, `[linux]` extras; `uv` for env management
-- [ ] `src/vhfwatch/models.py` — all core dataclasses from `docs/architecture.md` §4
-- [ ] `config.py` — `pydantic-settings`, TOML + env override; `config/config.example.toml` and `config/watchwords.example.toml`
+- [x] `pyproject.toml` with `[dev]`, `[macos]`, `[linux]` extras; `uv` for env management
+- [x] `src/vhfwatch/models.py` — all core dataclasses from `docs/architecture.md` §4
+- [x] `config.py` — `pydantic-settings`, TOML + env override; `config/config.example.toml` and `config/watchwords.example.toml`
 - [x] `.gitignore` — **`data/`, `config/config.toml`, `*.wav`, `*.db` first**
-- [ ] `store/schema.sql` + `store/db.py` — SQLite WAL, migrations, all tables
+- [x] `store/schema.sql` + `store/db.py` — SQLite WAL, migrations, all tables
 - [ ] `audio/sources.py` — `AudioSource` Protocol + `FileAudioSource`
 - [ ] `audio/segmenter.py` — RMS gate, hysteresis, hang time, pre-roll ring buffer, min/max duration
 - [ ] Segmenter unit tests with synthesized fixtures — the four required cases in `docs/conventions.md` §6
