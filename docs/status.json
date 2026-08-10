@@ -1,32 +1,32 @@
 {
   "_readme": "Machine-readable project status. Read this at the start of a session to orient; update it at the end of any task that changes what's built or what's broken. Prose belongs in the docs — this file is the ledger. Status values: not_started | in_progress | complete | blocked.",
-  "last_updated": "2026-07-30",
-  "current_phase": "Phase 1 — transcription and detection, offline",
+  "last_updated": "2026-08-10",
+  "current_phase": "POC code complete — next steps need hardware and corpus, not code",
   "phases": {
     "phase_0_skeleton": {
       "status": "complete",
       "hardware_required": false,
-      "notes": "Exit criterion verified 2026-07-30: `python -m vhfwatch.pipeline --source file --path tests/fixtures/sample.wav` segments the fixture into 2 transmissions in SQLite with WAV audio + SHA-256 on disk; all four required segmenter cases pass (tests/test_segmenter.py). Note: archival is 16-bit WAV for now (Opus/AAC lands in Phase 3, docs/decisions.md D13) and the pipeline refuses non-16 kHz files (resampling is a Phase 2 deliverable). DirectoryAudioSource also deferred to Phase 2."
+      "notes": "Exit criterion verified 2026-07-30. The Phase 0 refuse-non-16kHz behavior was replaced in Phase 2 by automatic resampling; archival WAV was replaced in Phase 3 by Opus+AAC (WAV remains the no-ffmpeg fallback)."
     },
     "phase_1_transcription_detection": {
-      "status": "not_started",
+      "status": "complete",
       "hardware_required": false,
-      "notes": "ASR implementations, hallucination filter, watchwords, LLM classification, correlator, evaluate.py. This is the phase that determines whether the project is viable — if precision is unusable here, no amount of later polish fixes it."
+      "notes": "All code items landed 2026-08-10: asr/ (mlx + faster_whisper behind Transcriber, warmup at startup), detect/ (hallucination gates, watchword matcher with phonetic guards per D14, LLM classifier with hard graceful degradation, severity resolution per architecture §5.5), incidents/correlator.py, scripts/replay.py + evaluate.py. 113 tests pass; ruff and mypy --strict clean. REMAINING (corpus-dependent, not code): hand-label data/labels.jsonl, run evaluate.py for a precision/recall baseline, and the base.en/small.en/medium.en WER comparison. Note: neither Whisper engine has been exercised against real audio yet — the first `python -m vhfwatch.pipeline --source file --path <wav>` run downloads the model (~500 MB) and is the real smoke test."
     },
     "phase_2_live_audio": {
-      "status": "blocked",
+      "status": "in_progress",
       "hardware_required": true,
-      "notes": "Blocked on hardware bring-up, not on code. Do not start debugging software against live audio before docs/hardware.md §5 Step 4 passes."
+      "notes": "All CODE items landed 2026-08-10: LiveAudioSource (device substring select, channel slice, gain warning, reconnect-with-backoff), soxr resampling wrapper, DirectoryAudioSource, calibrate.py, record_corpus.py, noise-floor drift warning, bounded queues with oldest-unflagged drop. NOT verified against hardware — the docs/hardware.md §5 bring-up procedure and the 30-minute segment-count exit criterion still stand between this and 'complete'. Do not debug software before §5 Step 4 passes."
     },
     "phase_3_alerting_and_record": {
-      "status": "not_started",
+      "status": "complete",
       "hardware_required": false,
-      "notes": "Alert channels, router, FastAPI incident record, waveform UI, useful/not-useful feedback."
+      "notes": "Landed 2026-08-10: console/macos/pushover channels behind AlertChannel, router (alert-once-then-update, dedupe, escalation re-alert; no-ack escalation via Pushover priority 2 per D16), offline-complete notification body, share tokens (hash-only storage, access logged), FastAPI web app as a separate process with all §5.10 routes, canvas waveform per D15, honest uncertainty rendering, feedback + annotations. Exit criterion (replayed mayday → Pushover → phone) needs VHFWATCH_PUSHOVER_* set and a phone — untested end-to-end."
     },
     "phase_4_reliability": {
       "status": "not_started",
       "hardware_required": true,
-      "notes": "Watchdog, heartbeats, no-transmission alert, noise-floor drift, daily self-test, systemd units, x86 Linux verification."
+      "notes": "Watchdog, heartbeats, no-transmission alert, daily self-test, systemd units, x86 Linux verification. Noise-floor drift warning already exists in the pipeline tick; the rest is unbuilt. /health is honest about this gap."
     },
     "phase_5_tuning": {
       "status": "not_started",
@@ -37,7 +37,7 @@
   "parallel_tracks": {
     "corpus_collection": {
       "status": "not_started",
-      "notes": "Real Ch 16 audio accumulates in wall-clock time and cannot be rushed later. Start recording as soon as ANY audio input works — this is the highest-value thing that can be happening in the background at all times. Corpus is shareable between rigs; calibration values are not (docs/decisions.md D11)."
+      "notes": "scripts/record_corpus.py is ready — start it the moment either rig's audio chain works. This is the highest-value background activity and every Phase 1 measurement is blocked on it."
     },
     "bringup_log": {
       "status": "not_started",
@@ -68,15 +68,31 @@
       "severity": "informational"
     },
     {
-      "description": "asr/, detect/, incidents/, alerting/, health/, and web/ are still specification only. The file-based pipeline (sources, segmenter, store, entry point) is real and tested.",
-      "severity": "informational"
-    },
-    {
-      "description": "Neither rig's audio chain has been verified end to end. The bring-up procedure in docs/hardware.md §5 has not been run, so all segmenter thresholds in docs/architecture.md §5.2 are starting guesses derived from theory, not from a measured noise floor.",
+      "description": "Real ASR has never run: tests use a fake transcriber, so mlx-whisper/faster-whisper are exercised only at the import/signature level. First pipeline run downloads the model and is the true ASR smoke test.",
       "severity": "medium"
     },
     {
-      "description": "ASR model choice (base.en / small.en / medium.en) is unresolved. docs/architecture.md says start with small.en, but the decision is supposed to be made on measured WER against the real corpus, and the corpus does not exist yet.",
+      "description": "LiveAudioSource's disconnect/reconnect path is untested against a real USB unplug — it needs a deliberate yank test during bring-up.",
+      "severity": "medium"
+    },
+    {
+      "description": "Neither rig's audio chain has been verified end to end. All segmenter thresholds are starting guesses derived from theory until scripts/calibrate.py runs on real hardware.",
+      "severity": "medium"
+    },
+    {
+      "description": "Pushover delivery is untested (needs VHFWATCH_PUSHOVER_TOKEN/USER and a phone). The Phase 3 exit criterion — alert deep link opens a playable incident record on a phone — has not been walked end to end.",
+      "severity": "medium"
+    },
+    {
+      "description": "The Tier 2 classifier prompt has never been evaluated against real traffic; llm_min_confidence=0.6 and the severity-resolution judgment calls in detect/detector.py are untuned defaults.",
+      "severity": "low"
+    },
+    {
+      "description": "ASR model choice (base.en / small.en / medium.en) is unresolved pending measured WER on the real corpus. Config defaults to small.en.",
+      "severity": "low"
+    },
+    {
+      "description": "The web app's 'dropped segments' honesty indicator is absent — nothing persists queue drops or pre-ASR rejects yet. Lands with Phase 4 health events.",
       "severity": "low"
     }
   ],

@@ -161,3 +161,69 @@ anyway and lands in Phase 3 behind the same `archive_wav` call site.
 `soundfile`/`soxr` genuinely useful), or the first time someone has a real
 24-bit or float WAV they need to replay. Add the dependency then; do not
 hand-roll 24-bit unpacking.
+
+*(Partially revisited with Phase 2: `soxr` was added for capture-rate →
+16 kHz resampling, exactly as this entry planned. File reading stays on
+stdlib `wave`, 16-bit PCM only.)*
+
+---
+
+## D14 — Phonetic matching is classic Metaphone plus guards, not Double Metaphone
+
+**Decided during Phase 1 implementation.** The architecture doc originally
+said "Double Metaphone (`jellyfish`)", but jellyfish does not ship Double
+Metaphone — only classic Metaphone. Rather than add a dependency, the
+matcher uses classic Metaphone with two guards:
+
+1. **Code equality relaxed to edit distance ≤ 1** ("mated" = MTT vs
+   "mayday" = MT — the canonical mangling the phonetic tier exists for).
+2. **A Jaro-Winkler similarity floor (`phonetic_min_similarity`, 0.70)**,
+   because Metaphone codes are 2-3 characters and collide absurdly on
+   their own ("mud" and "mayday" are both MT).
+3. **Terms with tokens shorter than `phonetic_min_token_len` (4) skip the
+   phonetic pass entirely** — "cpr" is one phonetic edit from "copy", the
+   most common word on a radio. Exact and fuzzy matching still cover them.
+
+**Why not add a double-metaphone package:** the available ones are
+unmaintained or heavy, and there's no evidence yet that classic Metaphone
+plus guards under-performs — that evidence would come from
+`scripts/evaluate.py` on the real corpus.
+
+**Revisit when:** evaluate.py shows mangled-keyword recall is materially
+worse than the false-positive cost of loosening the guards.
+
+---
+
+## D15 — Waveform rendering is ~40 lines of vanilla canvas, not wavesurfer.js
+
+**Decided during Phase 3 implementation.** The incident page draws
+waveforms with WebAudio `decodeAudioData` + a canvas, with click-to-seek.
+
+**Why:** wavesurfer.js would come from a CDN (violates local-first — the
+record must render with the network unplugged) or be vendored into the
+repo (a 100+ kB third-party artifact nobody here can review). The vanilla
+version is small enough to read in one sitting and has no dependency to
+rot.
+
+**Revisit when:** the POC proves out and the web layer graduates to a real
+frontend build (the "later" PWA in the roadmap) — vendoring becomes normal
+practice at that point.
+
+---
+
+## D16 — No-ack escalation is Pushover emergency priority, not router logic
+
+**Decided during Phase 3 implementation.** CRITICAL alerts go out at
+Pushover priority 2, which re-alerts every `retry_s` until acknowledged or
+`expire_s`. The router does not implement its own re-alert timer; the
+planned `escalate_after_s` config key was removed rather than shipped
+unused.
+
+**Why:** two escalation mechanisms fighting each other is how people get
+trained to silence the app (D12's failure mode). Pushover's is
+server-side, survives the monitoring box dying mid-incident, and is
+already acknowledged-aware.
+
+**Revisit when:** a second real alerting channel (e.g. the GPIO buzzer)
+needs escalation semantics of its own — that's when a router-level
+mechanism earns its complexity.

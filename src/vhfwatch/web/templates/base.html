@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}vhf-watch{% endblock %}</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 0 auto;
+         max-width: 46rem; padding: 1rem; line-height: 1.45; }
+  a { color: inherit; }
+  .sev { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 4px;
+         font-weight: 700; font-size: 0.85rem; color: #fff; }
+  .sev-critical { background: #c0392b; }
+  .sev-urgent   { background: #d68910; }
+  .sev-watch    { background: #7d8a96; }
+  .sev-routine  { background: #b0b8bf; }
+  .card { border: 1px solid rgba(128,128,128,.35); border-radius: 8px;
+          padding: 0.8rem 1rem; margin: 0.7rem 0; }
+  .muted { opacity: 0.65; font-size: 0.9rem; }
+  .low-conf { opacity: 0.45; font-style: italic; }
+  .word { cursor: pointer; }
+  .word:hover { text-decoration: underline; }
+  .quote { border-left: 3px solid rgba(128,128,128,.5); padding-left: 0.7rem;
+           margin: 0.4rem 0; }
+  canvas.wave { width: 100%; height: 56px; display: block;
+                background: rgba(128,128,128,.12); border-radius: 4px;
+                cursor: pointer; }
+  form.inline { display: inline; }
+  input, button, textarea { font: inherit; padding: 0.3rem 0.6rem; }
+  button { cursor: pointer; }
+  .ok { color: #1e8e3e; font-weight: 600; }
+  header { display: flex; justify-content: space-between; align-items: baseline; }
+  header h1 { font-size: 1.2rem; }
+  .disclaimer { font-size: 0.78rem; opacity: 0.6; margin-top: 2rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1><a href="/" style="text-decoration:none">vhf-watch</a></h1>
+  <span class="muted">supplemental awareness — not a safety system</span>
+</header>
+{% block content %}{% endblock %}
+<p class="disclaimer">This is a hobbyist monitoring tool. It misses
+transmissions, mishears words, and goes down without warning. Never rely on
+it as a primary alerting path.</p>
+</body>
+</html>

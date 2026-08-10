@@ -254,7 +254,7 @@ Implementations:
 - **`DirectoryAudioSource`** — plays a corpus directory in timestamp order. The tuning workhorse.
 - **`LiveAudioSource`** — `sounddevice` input stream. Config: device name or index, sample rate, block size. Must survive device disconnect and reconnect without crashing the process.
 
-Capture at the device's native rate (usually 48 kHz), resample to **16 kHz mono float32** for everything downstream. Whisper wants 16 kHz; marine VHF audio is ~3 kHz bandwidth, so nothing is lost.
+Capture at the device's native rate (usually 48 kHz), resample to **16 kHz mono float32** for everything downstream. Whisper wants 16 kHz; marine VHF audio is ~3 kHz bandwidth, so nothing is lost. Implemented as `ResamplingAudioSource` (`audio/resample.py`, streaming `soxr`) wrapping any source, so the pipeline sees 16 kHz frames whether the input is a 48 kHz live stream or an already-16 kHz fixture.
 
 **Both supported interfaces present 2 input channels.** Slice `use_channel` (default 0); never average, or you lose 6 dB when the other channel is silent and invalidate the VAD calibration.
 
@@ -298,7 +298,7 @@ class Transcriber(Protocol):
 |---|---|---|
 | `MLXWhisperTranscriber` | Apple Silicon | **Dev default.** `mlx-whisper` is materially faster than alternatives on M-series. |
 | `FasterWhisperTranscriber` | Portable, x86 + ARM | **Deployment default.** CTranslate2; CPU-only on Mac (no Metal) but runs everywhere. |
-| `DeepgramTranscriber` | Cloud | Optional. Streaming, keyterm boosting, good on noisy telephony-grade audio. |
+| `DeepgramTranscriber` | Cloud | Optional upgrade, **deliberately not built for the POC** (local-first); selecting it in config fails loudly. |
 
 Select by config, not by platform detection at import time. **`warmup()` must be called at startup** — first-inference model load is multi-second and you don't want that latency on a real mayday.
 
@@ -332,6 +332,8 @@ Whisper confidently invents text on noise-only and near-silent audio. **This wil
    - Any single token repeated more than 3 times consecutively
 4. **Log every rejection with its reason.** You need to know what you're throwing away, and a rejected segment that turns out to be a real mayday is exactly what the corpus review should surface.
 
+Post-ASR rejects are still **stored** in the transcript table (they're evidence for corpus review) — they just never reach the detector.
+
 ### 5.5 Detector
 
 Two tiers, in order.
@@ -341,9 +343,16 @@ Two tiers, in order.
 Literal matching misses real distress calls: "mayday" degrades to "may day", "made a", "mated", "hey day". So:
 
 1. Normalize: lowercase, strip punctuation, collapse whitespace.
-2. Exact and substring match on the configured term list.
-3. **Phonetic match** via Double Metaphone (`jellyfish`) so "mated" collides with "mayday".
-4. **Bounded fuzzy match** via `rapidfuzz`, ratio ≥ 0.82, on multi-word phrases.
+2. Exact and substring match on the configured term list (word-boundary
+   padded — "aground" must not fire inside "background").
+3. **Phonetic match** via classic Metaphone (`jellyfish` — it does not ship
+   Double Metaphone; see `docs/decisions.md` D14) with guards: codes may
+   differ by one edit ("mated" MTT vs "mayday" MT), the matched window must
+   also pass a Jaro-Winkler similarity floor (`phonetic_min_similarity`),
+   and terms with tokens shorter than `phonetic_min_token_len` skip this
+   pass entirely ("cpr" vs "copy").
+4. **Bounded fuzzy match** via `rapidfuzz`, ratio ≥ 0.82, on multi-word
+   phrases, against token windows of the same length.
 
 **Tier 2 — LLM classification.**
 
@@ -429,7 +438,7 @@ class AlertChannel(Protocol):
 
 **The notification body must be fully actionable with no connectivity.** Cell coverage drops offshore; assume the recipient may never load the web page. Include severity, time, vessel, nature, position, and a verbatim quote in the message itself. The incident page is the rich layer, never the only path.
 
-Routing by severity, with escalation on no-acknowledgment. **Deliberately do not build SMS for the POC** — US A2P 10DLC registration takes days to weeks and will block you. Pushover works in ten minutes.
+Routing by severity. Escalation-until-acknowledged is Pushover's emergency priority (retry/expire on priority 2), not a second router-level timer — see `docs/decisions.md` D16. **Deliberately do not build SMS for the POC** — US A2P 10DLC registration takes days to weeks and will block you. Pushover works in ten minutes.
 
 ### 5.8 Store
 
@@ -492,7 +501,7 @@ VHFWATCH_DEEPGRAM_API_KEY   # optional
 - **Unit tests** for segmenter, watchword matcher, hallucination filter, correlator — all pure functions over fixtures, no hardware, no network.
 - **Segmenter fixtures:** synthesize WAVs with known speech/silence patterns and assert exact boundaries. Cover: pause mid-transmission (must not split), sub-threshold blip (must not open), stuck carrier (must force-close), transmission starting at t=0 (pre-roll edge case).
 - **Correlator tests:** synthetic detection streams asserting expected grouping, including channel migration and severity escalation.
-- **`scripts/evaluate.py`** — run the pipeline over a labeled corpus and report precision, recall, and per-watchword false-positive counts. **This is the main tuning instrument.** Build it in Phase 1 and keep it working.
+- **`scripts/evaluate.py`** — run the pipeline over a labeled corpus and report precision, recall, and per-watchword false-positive counts. **This is the main tuning instrument.** Build it in Phase 1 and keep it working. Labels live in `data/labels.jsonl`, one object per line: `{"file": "<corpus wav>", "label": "distress" | "urgency" | "routine", "notes": "..."}`. A file counts as a predicted positive when any detection reaches URGENT or above.
 - **Committed fixtures must be synthetic.** No real radio traffic in the repo, ever.
 
 ---

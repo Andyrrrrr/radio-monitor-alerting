@@ -50,11 +50,16 @@ def frames(
     return out
 
 
-def write_wav16(path: Path, pcm: npt.NDArray[np.float32], channels: int = 1) -> None:
+def write_wav16(
+    path: Path,
+    pcm: npt.NDArray[np.float32],
+    channels: int = 1,
+    rate: int = RATE,
+) -> None:
     """Write float32 PCM as 16-bit WAV (what FileAudioSource reads)."""
     ints = (np.clip(pcm, -1.0, 1.0) * 32767.0).astype(np.int16)
     with wave.open(str(path), "wb") as wf:
         wf.setnchannels(channels)
         wf.setsampwidth(2)
-        wf.setframerate(RATE)
+        wf.setframerate(rate)
         wf.writeframes(ints.tobytes())

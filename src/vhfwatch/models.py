@@ -126,6 +126,20 @@ class IncidentSummary:
 
 
 @dataclass
+class AlertResult:
+    """Outcome of one send attempt on one channel.
+
+    Kept as data (not an exception) because a failed channel is routine —
+    the router logs it and the other channels still fire. `detail` carries
+    the error message or the provider's receipt for the delivery log.
+    """
+
+    channel: str
+    ok: bool
+    detail: str | None = None
+
+
+@dataclass
 class Incident:
     """One real-world emergency, spanning many transmissions.
 

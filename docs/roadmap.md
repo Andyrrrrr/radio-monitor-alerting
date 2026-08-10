@@ -31,16 +31,16 @@ Ordered milestones with exit criteria. Work top to bottom. Each phase produces s
 
 Still no hardware. This is where accuracy gets established.
 
-- [ ] `asr/base.py` Protocol; `asr/mlx.py` (dev) and `asr/faster_whisper.py` (portable)
-- [ ] `warmup()` called at pipeline startup
-- [ ] `detect/hallucination.py` — pre-ASR SNR/duration gate, post-ASR logprob gate, artifact blocklist, repetition detection. **Log every rejection with its reason.**
-- [ ] `detect/watchwords.py` — normalize, exact, Double Metaphone (`jellyfish`), fuzzy (`rapidfuzz` ≥ 0.82)
-- [ ] `detect/classify.py` — LLM with structured `IncidentSummary` output, "never infer" prompt, preceding-transmission context, 5 s timeout, **graceful degradation to Tier 1 on failure**
-- [ ] `incidents/correlator.py` — grouping, open/accrue/close, severity escalation without auto-de-escalation
-- [ ] `scripts/replay.py` and `scripts/evaluate.py`
-- [ ] Hand-label the corpus into `data/labels.jsonl`
+- [x] `asr/base.py` Protocol; `asr/mlx.py` (dev) and `asr/faster_whisper.py` (portable)
+- [x] `warmup()` called at pipeline startup
+- [x] `detect/hallucination.py` — pre-ASR SNR/duration gate, post-ASR logprob gate, artifact blocklist, repetition detection. **Log every rejection with its reason.**
+- [x] `detect/watchwords.py` — normalize, exact, phonetic (classic Metaphone + guards — see `docs/decisions.md` D14), fuzzy (`rapidfuzz` ≥ 0.82)
+- [x] `detect/classify.py` — LLM with structured `IncidentSummary` output, "never infer" prompt, preceding-transmission context, 5 s timeout, **graceful degradation to Tier 1 on failure**
+- [x] `incidents/correlator.py` — grouping, open/accrue/close, severity escalation without auto-de-escalation
+- [x] `scripts/replay.py` and `scripts/evaluate.py`
+- [ ] Hand-label the corpus into `data/labels.jsonl` *(needs corpus audio)*
 
-**Exit:** `evaluate.py` runs over the labeled corpus and reports precision, recall, and per-watchword false-positive counts. You have measured WER for `base.en` / `small.en` / `medium.en` on real audio and picked one on evidence. One real conversation collapses into one incident, verified by replaying recorded traffic.
+**Exit:** `evaluate.py` runs over the labeled corpus and reports precision, recall, and per-watchword false-positive counts. You have measured WER for `base.en` / `small.en` / `medium.en` on real audio and picked one on evidence. One real conversation collapses into one incident, verified by replaying recorded traffic. *(Code side is in place, with the one-conversation-one-incident property pinned by tests over synthetic audio; the corpus-dependent measurements remain.)*
 
 **This is the phase that determines whether the project is viable.** If precision is unusable here, no amount of Phase 3 polish fixes it.
 
@@ -50,15 +50,15 @@ Still no hardware. This is where accuracy gets established.
 
 Hardware enters. Work through the verification procedure in `docs/hardware.md` §5 — don't debug software before Step 4 passes.
 
-- [ ] `LiveAudioSource` via `sounddevice`, surviving device disconnect/reconnect without killing the process
-- [ ] Channel selection via `use_channel` — slice, never average
-- [ ] `input_gain_db` applied post-capture, with a startup warning above ~12 dB
-- [ ] Native-rate capture → 16 kHz mono float32 resample
-- [ ] `scripts/calibrate.py` — measure noise floor, suggest `open_threshold_db`, write to config
-- [ ] Startup noise-floor check warning on >6 dB drift from calibrated value
-- [ ] Clipping detection and warning
-- [ ] `scripts/record_corpus.py` — continuous timestamped recording, rotating files
-- [ ] Bounded queues with oldest-unflagged drop policy and loud logging
+- [x] `LiveAudioSource` via `sounddevice`, surviving device disconnect/reconnect without killing the process *(code written; reconnect behavior needs a hardware unplug test)*
+- [x] Channel selection via `use_channel` — slice, never average
+- [x] `input_gain_db` applied post-capture, with a startup warning above ~12 dB
+- [x] Native-rate capture → 16 kHz mono float32 resample
+- [x] `scripts/calibrate.py` — measure noise floor, suggest `open_threshold_db`, prints a paste-ready config snippet
+- [x] Noise-floor drift warning (>6 dB from calibrated value, checked continuously while live)
+- [x] Clipping detection and warning
+- [x] `scripts/record_corpus.py` — continuous timestamped recording, rotating files
+- [x] Bounded queues with oldest-unflagged drop policy and loud logging
 
 **Exit:** the radio parked on Ch 16 produces segmented transmissions that appear in the database with sane boundaries, and a 30-minute run's segment count roughly matches what you heard by ear.
 
@@ -68,18 +68,18 @@ Hardware enters. Work through the verification procedure in `docs/hardware.md` �
 
 Now it becomes usable by a person.
 
-- [ ] `alerting/base.py` Protocol; `console.py`, `macos.py` (osascript), `pushover.py`
-- [ ] `alerting/router.py` — severity routing, alert-once-then-update-in-place, escalation on no-ack, dedupe
-- [ ] **Notification body fully actionable with zero connectivity** — severity, time, vessel, nature, position, verbatim quote in the message itself
-- [ ] Signed per-recipient access tokens; store hashes, log access
-- [ ] `web/app.py` FastAPI, **separate process**, all routes from `docs/architecture.md` §5.10
-- [ ] Incident page in priority order: status line → latest transmission one-tap playable → full transcript with synced audio → summary adjacent to transcript → ack + feedback
-- [ ] `wavesurfer.js` waveform, click-to-seek, matched watchwords marked
-- [ ] **Uncertainty rendered honestly** — low-confidence words greyed, signal-strength glyph, which tier fired, count of dropped segments
-- [ ] AAC/M4A playback copies generated at ingest
-- [ ] SHA-256 of audio at ingest, displayed on the record
-- [ ] **Useful / not-useful feedback control** — this is the labeled-data engine, not a nice-to-have
-- [ ] Annotations as append-only rows
+- [x] `alerting/base.py` Protocol; `console.py`, `macos.py` (osascript), `pushover.py`
+- [x] `alerting/router.py` — severity routing, alert-once-then-update-in-place, dedupe; no-ack escalation is Pushover emergency priority (`docs/decisions.md` D16)
+- [x] **Notification body fully actionable with zero connectivity** — severity, time, vessel, nature, position, verbatim quote in the message itself
+- [x] Signed per-recipient access tokens; store hashes, log access
+- [x] `web/app.py` FastAPI, **separate process**, all routes from `docs/architecture.md` §5.10
+- [x] Incident page in priority order: status line → latest transmission one-tap playable → full transcript with synced audio → summary adjacent to transcript → ack + feedback
+- [x] Waveform (vanilla canvas — `docs/decisions.md` D15), click-to-seek; matched terms listed per transmission
+- [x] **Uncertainty rendered honestly** — low-confidence words greyed, signal-strength glyph, which tier fired *(count of dropped segments waits for Phase 4's health events — nothing persists that yet)*
+- [x] AAC/M4A playback copies generated at ingest
+- [x] SHA-256 of audio at ingest, displayed on the record
+- [x] **Useful / not-useful feedback control** — this is the labeled-data engine, not a nice-to-have
+- [x] Annotations as append-only rows
 
 **Exit:** a replayed recorded mayday produces a Pushover notification whose deep link opens an incident record with playable audio, synced transcript, summary, and working ack/feedback — on a phone. Kill the web app and confirm alerts still fire.
 

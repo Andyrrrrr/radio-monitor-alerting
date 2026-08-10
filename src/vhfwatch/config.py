@@ -89,7 +89,9 @@ class AsrConfig(_Section):
     engine: Literal["mlx", "faster_whisper", "deepgram"] = "mlx"
     model: str = "small.en"
     temperature: float = 0.0  # determinism for tuning runs
-    beam_size: int = 5
+    beam_size: int = 5  # faster_whisper only; mlx-whisper decodes greedily
+    fw_device: str = "auto"  # faster_whisper only: "auto" | "cpu" | "cuda"
+    fw_compute_type: str = "int8"  # faster_whisper only; int8 is the CPU sweet spot
     condition_on_previous_text: bool = False  # stops hallucination loops
     no_speech_threshold: float = 0.6
     logprob_threshold: float = -1.0
@@ -118,8 +120,18 @@ class HallucinationConfig(_Section):
 
 
 class DetectConfig(_Section):
+    watchwords_path: Path = Path("config/watchwords.toml")
     fuzzy_min_ratio: float = 0.82
+    # Phonetic hits must also look like the term (Jaro-Winkler): Metaphone
+    # codes are 2-3 chars and collide wildly ("mud" == "mayday"), so code
+    # equality alone would spray false positives.
+    phonetic_min_similarity: float = 0.70
+    # Terms with any token shorter than this skip the phonetic pass: short
+    # Metaphone codes collide with everyday radio words ("copy" ↔ "cpr"),
+    # and exact + fuzzy matching still cover those terms.
+    phonetic_min_token_len: int = 4
     llm_min_words: int = 8  # classify longer transcripts even with no match
+    llm_min_confidence: float = 0.6  # below this the LLM verdict only rates WATCH
     llm_timeout_s: float = 5.0
     llm_model: str = "claude-haiku-4-5-20251001"
     llm_context_count: int = 3  # preceding transmissions passed as context
@@ -129,6 +141,7 @@ class CorrelatorConfig(_Section):
     quiet_period_s: int = 300  # no activity → close incident
     vessel_match_ratio: float = 0.80
     max_incident_duration_s: int = 3600
+    position_match_km: float = 5.0  # tie-break between candidate incidents
 
 
 class PushoverConfig(_Section):
@@ -143,7 +156,8 @@ class AlertingConfig(_Section):
     channels_urgent: list[str] = ["console", "macos", "pushover"]
     channels_watch: list[str] = ["console"]
     channels_routine: list[str] = []
-    escalate_after_s: int = 60  # no ack → escalate
+    # No-ack escalation is Pushover's emergency priority (retry until
+    # acknowledged), not router logic — one mechanism, not two.
     dedupe_window_s: int = 300
     pushover: PushoverConfig = PushoverConfig()
 

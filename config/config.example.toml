@@ -50,10 +50,12 @@ noise_ema_alpha    = 0.05      # smoothing for the running noise-floor estimate
                                # noisier sites, lower for steadier estimates
 
 [asr]
-engine        = "mlx"          # "mlx" (Apple Silicon) | "faster_whisper" | "deepgram"
-model         = "small.en"
+engine        = "mlx"          # "mlx" (Apple Silicon) | "faster_whisper" (portable)
+model         = "small.en"     # first run downloads the model (~500 MB, once)
 temperature   = 0.0            # determinism for tuning runs
-beam_size     = 5
+beam_size     = 5              # faster_whisper only; mlx-whisper decodes greedily
+fw_device       = "auto"       # faster_whisper only: "auto" | "cpu" | "cuda"
+fw_compute_type = "int8"       # faster_whisper only; int8 is the CPU sweet spot
 condition_on_previous_text = false   # stops hallucination loops
 no_speech_threshold        = 0.6
 logprob_threshold          = -1.0
@@ -72,8 +74,16 @@ blocklist = [
 ]
 
 [detect]
+watchwords_path       = "config/watchwords.toml"  # falls back to the .example
 fuzzy_min_ratio       = 0.82
+# Phonetic (Metaphone) hits must also LOOK like the term (Jaro-Winkler ≥
+# this) — phonetic codes are 2-3 chars and collide wildly on their own.
+phonetic_min_similarity = 0.70
+# Terms with tokens shorter than this skip the phonetic pass entirely
+# ("cpr" is one phonetic edit from "copy", the most common word on a radio).
+phonetic_min_token_len  = 4
 llm_min_words         = 8      # classify longer transcripts even with no match
+llm_min_confidence    = 0.6    # below this the LLM verdict only rates WATCH
 llm_timeout_s         = 5.0
 llm_model             = "claude-haiku-4-5-20251001"
 llm_context_count     = 3      # preceding transmissions passed as context
@@ -82,13 +92,15 @@ llm_context_count     = 3      # preceding transmissions passed as context
 quiet_period_s          = 300  # no activity → close incident
 vessel_match_ratio      = 0.80
 max_incident_duration_s = 3600
+position_match_km       = 5.0  # position tie-break between candidate incidents
 
 [alerting]
 channels_critical = ["console", "macos", "pushover"]
 channels_urgent   = ["console", "macos", "pushover"]
 channels_watch    = ["console"]
 channels_routine  = []
-escalate_after_s  = 60         # no ack → escalate
+# No-ack escalation is Pushover emergency priority (retry until acked below),
+# not a separate router mechanism.
 dedupe_window_s   = 300
 
 [alerting.pushover]

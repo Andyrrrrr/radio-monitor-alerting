@@ -23,6 +23,27 @@ dependencies = [
   "sounddevice>=0.4",
   # structlog: structured key-value logging (docs/conventions.md §4)
   "structlog>=24.1",
+  # soxr: 48 kHz capture → 16 kHz pipeline resampling. Proper anti-aliased
+  # resampling is exactly the kind of DSP we should not hand-roll
+  # (docs/decisions.md D13 revisit clause).
+  "soxr>=0.4",
+  # jellyfish (Double Metaphone) + rapidfuzz (bounded fuzzy): watchword
+  # matching robust to ASR mangling — "mated" must collide with "mayday"
+  # (docs/architecture.md §5.5).
+  "jellyfish>=1.0",
+  "rapidfuzz>=3.6",
+  # anthropic: Tier 2 LLM classification. Optional at runtime — the alert
+  # path degrades to Tier 1 without it (AGENTS.md constraint 6).
+  "anthropic>=0.40",
+  # httpx: async HTTP for the Pushover alert channel.
+  "httpx>=0.27",
+  # fastapi + uvicorn + jinja2: the incident-record web app, a separate
+  # process that only reads the store (docs/architecture.md §5.10).
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+  "jinja2>=3.1",
+  # python-multipart: FastAPI's form parsing (ack/feedback/annotation forms)
+  "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
@@ -31,12 +52,12 @@ dev = [
   "ruff>=0.4",
   "mypy>=1.10",
 ]
-# Platform extras are placeholders until their phases land dependencies:
-# mlx-whisper goes in [macos] and faster-whisper in [linux] with Phase 1
-# (docs/roadmap.md). They exist now so the install commands in AGENTS.md
-# work from day one.
-macos = []
-linux = []
+# ASR engines are platform extras (docs/conventions.md §5): mlx-whisper is
+# Apple-Silicon-only and materially faster there; faster-whisper is the
+# portable deployment default. Selected by [asr].engine in config, never by
+# platform sniffing.
+macos = ["mlx-whisper>=0.4"]
+linux = ["faster-whisper>=1.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/vhfwatch"]
@@ -54,6 +75,12 @@ strict = true
 plugins = ["pydantic.mypy"]
 mypy_path = "src"
 explicit_package_bases = true
+
+# Audio/ML libraries that ship no type stubs. Calls into them are still
+# checked against our annotations; only their internals go unchecked.
+[[tool.mypy.overrides]]
+module = ["sounddevice", "soxr", "mlx_whisper", "faster_whisper"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

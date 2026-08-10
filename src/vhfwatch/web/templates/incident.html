@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}incident {{ incident.id[:10] }} — vhf-watch{% endblock %}
+{% block content %}
+
+{# 1. One-line status: severity, time, vessel, nature, position #}
+<h2>
+  <span class="sev sev-{{ incident.severity }}">{{ incident.severity | upper }}</span>
+  {% if incident.summary and incident.summary.vessel_name %}{{ incident.summary.vessel_name }}{% else %}Unidentified vessel{% endif %}
+</h2>
+<p>
+  {{ incident.opened_at }} · ch {{ incident.channels | join(", ") }} ·
+  {{ incident.status }}
+  {% if incident.summary %}
+    {% if incident.summary.nature_of_emergency %} · {{ incident.summary.nature_of_emergency }}{% endif %}
+    {% if incident.summary.position_as_stated %} · “{{ incident.summary.position_as_stated }}”{% endif %}
+    {% if incident.summary.latitude is not none %} · {{ incident.summary.latitude }}, {{ incident.summary.longitude }}{% endif %}
+  {% endif %}
+</p>
+{% if incident.acknowledged_by %}
+  <p class="ok">Acknowledged by {{ incident.acknowledged_by }} at {{ incident.acknowledged_at }}</p>
+{% else %}
+  <form class="inline" method="post" action="/incidents/{{ incident.id }}/ack">
+    <input type="hidden" name="token" value="{{ token }}">
+    <input name="by" placeholder="your name" required>
+    <button type="submit">Acknowledge</button>
+  </form>
+{% endif %}
+
+{# 2. Latest transmission playable in one tap #}
+{% if timeline %}
+  {% set latest = timeline[-1] %}
+  <h3>Latest transmission</h3>
+  <div class="card">
+    <audio controls preload="metadata" style="width:100%"
+           src="/transmissions/{{ latest.transmission.id }}/audio{% if token %}?token={{ token }}{% endif %}"></audio>
+  </div>
+{% endif %}
+
+{# 3. Full chronological transcript with synced audio + honest uncertainty #}
+<h3>Transmissions</h3>
+{% for item in timeline %}
+  {% set audio_id = "tx-" ~ loop.index %}
+  <div class="card">
+    <div class="muted">
+      {{ item.transmission.started_at }} ·
+      signal <span title="estimated SNR: {{ item.est_snr_db }} dB">{{ item.snr_glyph }}</span> ·
+      {{ item.transmission.duration_ms }} ms ·
+      detection: {{ item.tier }}
+      {% if item.matched_terms %} · matched: {{ item.matched_terms | join(", ") }}{% endif %}
+    </div>
+    <canvas class="wave" data-audio="{{ audio_id }}"></canvas>
+    <audio id="{{ audio_id }}" preload="none" controls style="width:100%"
+           src="/transmissions/{{ item.transmission.id }}/audio{% if token %}?token={{ token }}{% endif %}"></audio>
+    <p class="quote">
+      {% if item.words %}
+        {% for w in item.words %}<span class="word {% if w.low_confidence %}low-conf{% endif %}"
+              onclick="seek('{{ audio_id }}', {{ w.start_s }})">{{ w.text }}</span> {% endfor %}
+      {% else %}
+        {{ item.text }}
+      {% endif %}
+    </p>
+    <div class="muted">engine: {{ item.engine }} · greyed words are
+      low-confidence — trust the audio over the text ·
+      audio sha256 <code title="{{ item.transmission.audio_sha256 }}">{{ item.transmission.audio_sha256[:12] }}…</code></div>
+  </div>
+{% endfor %}
+
+{# 4. Summary adjacent to the transcript, never behind a tab #}
+{% if incident.summary %}
+  <h3>Classifier summary <span class="muted">(automated — verify against audio above)</span></h3>
+  <div class="card">
+    <div class="quote">“{{ incident.summary.verbatim_quote }}”</div>
+    <ul>
+      {% if incident.summary.nature_of_emergency %}<li>Nature: {{ incident.summary.nature_of_emergency }}</li>{% endif %}
+      {% if incident.summary.vessel_name %}<li>Vessel: {{ incident.summary.vessel_name }}</li>{% endif %}
+      {% if incident.summary.vessel_description %}<li>Description: {{ incident.summary.vessel_description }}</li>{% endif %}
+      {% if incident.summary.position_as_stated %}<li>Position as stated: {{ incident.summary.position_as_stated }}</li>{% endif %}
+      {% if incident.summary.persons_aboard is not none %}<li>Persons aboard: {{ incident.summary.persons_aboard }}</li>{% endif %}
+      {% if incident.summary.injuries_reported %}<li>Injuries: {{ incident.summary.injuries_reported }}</li>{% endif %}
+    </ul>
+    <div class="muted">Reasoning: {{ incident.summary.reasoning }}</div>
+  </div>
+{% else %}
+  <h3>Classifier summary</h3>
+  <p class="muted">No LLM summary — classification was unavailable for this
+  incident. The raw transcripts above are the record.</p>
+{% endif %}
+
+{# 5. Feedback — the labeled-data engine #}
+<h3>Was this alert useful?</h3>
+<form class="inline" method="post" action="/incidents/{{ incident.id }}/feedback">
+  <input type="hidden" name="token" value="{{ token }}">
+  <input type="hidden" name="verdict" value="useful">
+  <input type="hidden" name="by" value="web">
+  <button type="submit">Useful</button>
+</form>
+<form class="inline" method="post" action="/incidents/{{ incident.id }}/feedback">
+  <input type="hidden" name="token" value="{{ token }}">
+  <input type="hidden" name="verdict" value="not-useful">
+  <input type="hidden" name="by" value="web">
+  <button type="submit">Not useful</button>
+</form>
+
+<h3>Notes &amp; corrections</h3>
+{% for note in annotations %}
+  <div class="card"><strong>{{ note.author }}</strong>
+    <span class="muted">{{ note.created_at }}</span><br>{{ note.body }}</div>
+{% endfor %}
+<form method="post" action="/incidents/{{ incident.id }}/annotations">
+  <input type="hidden" name="token" value="{{ token }}">
+  <input name="author" placeholder="your name" required>
+  <textarea name="body" rows="2" style="width:100%"
+            placeholder="correction or note — appended, never overwrites"></textarea>
+  <button type="submit">Add note</button>
+</form>
+
+<script>
+function seek(audioId, start) {
+  const audio = document.getElementById(audioId);
+  audio.currentTime = start;
+  audio.play();
+}
+// Draw simple waveforms and wire click-to-seek. Vanilla and local-first:
+// no CDN, works with the network unplugged.
+document.querySelectorAll("canvas.wave").forEach(async (canvas) => {
+  const audio = document.getElementById(canvas.dataset.audio);
+  canvas.addEventListener("click", (e) => {
+    if (!audio.duration) { audio.play(); return; }
+    const frac = e.offsetX / canvas.clientWidth;
+    audio.currentTime = frac * audio.duration;
+    audio.play();
+  });
+  try {
+    const resp = await fetch(audio.src);
+    const buf = await new AudioContext().decodeAudioData(await resp.arrayBuffer());
+    const data = buf.getChannelData(0);
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width = canvas.clientWidth * devicePixelRatio;
+    const H = canvas.height = canvas.clientHeight * devicePixelRatio;
+    const step = Math.max(1, Math.floor(data.length / W));
+    ctx.fillStyle = "rgba(120,140,160,0.9)";
+    for (let x = 0; x < W; x++) {
+      let peak = 0;
+      for (let i = x * step; i < (x + 1) * step && i < data.length; i++)
+        peak = Math.max(peak, Math.abs(data[i]));
+      const h = Math.max(1, peak * H);
+      ctx.fillRect(x, (H - h) / 2, 1, h);
+    }
+  } catch (err) { canvas.style.display = "none"; }
+});
+</script>
+{% endblock %}
