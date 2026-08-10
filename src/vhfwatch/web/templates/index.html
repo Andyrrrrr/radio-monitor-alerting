@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}incidents — vhf-watch{% endblock %}
+{% block content %}
+<h2>Incidents</h2>
+{% if not incidents %}
+  <p class="muted">Nothing yet. The pipeline writes incidents here when
+  detections fire.</p>
+{% endif %}
+{% for inc in incidents %}
+  <div class="card">
+    <div>
+      <span class="sev sev-{{ inc.severity }}">{{ inc.severity | upper }}</span>
+      <a href="/incidents/{{ inc.id }}">
+        {% if inc.summary and inc.summary.vessel_name %}
+          {{ inc.summary.vessel_name }}
+        {% else %}
+          unidentified vessel
+        {% endif %}
+        — {% if inc.summary and inc.summary.nature_of_emergency %}{{ inc.summary.nature_of_emergency }}{% else %}see record{% endif %}
+      </a>
+    </div>
+    <div class="muted">
+      opened {{ inc.opened_at }} · ch {{ inc.channels | join(", ") }} ·
+      {{ inc.status }}{% if inc.acknowledged_by %} · acked by {{ inc.acknowledged_by }}{% endif %}
+    </div>
+  </div>
+{% endfor %}
+{% endblock %}

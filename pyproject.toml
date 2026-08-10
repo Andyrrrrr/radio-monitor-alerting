@@ -1,0 +1,86 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vhfwatch"
+version = "0.1.0"
+description = "Marine VHF Ch 16 distress monitoring — a hobbyist supplemental awareness tool, not a safety system"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+dependencies = [
+  # numpy: PCM audio buffers throughout the pipeline (models.AudioFrame etc.)
+  "numpy>=1.26",
+  # pydantic + pydantic-settings: typed config with TOML loading and
+  # VHFWATCH_* env var override (docs/architecture.md §6)
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  # python-ulid: IDs that sort chronologically (docs/conventions.md §3)
+  "python-ulid>=2.2",
+  # sounddevice: PortAudio capture, used on BOTH platforms (Core Audio on
+  # macOS, ALSA on Linux) so it's a base dep, not a platform extra. macOS
+  # wheels bundle PortAudio; Linux needs libportaudio2 from the distro.
+  "sounddevice>=0.4",
+  # structlog: structured key-value logging (docs/conventions.md §4)
+  "structlog>=24.1",
+  # soxr: 48 kHz capture → 16 kHz pipeline resampling. Proper anti-aliased
+  # resampling is exactly the kind of DSP we should not hand-roll
+  # (docs/decisions.md D13 revisit clause).
+  "soxr>=0.4",
+  # jellyfish (Double Metaphone) + rapidfuzz (bounded fuzzy): watchword
+  # matching robust to ASR mangling — "mated" must collide with "mayday"
+  # (docs/architecture.md §5.5).
+  "jellyfish>=1.0",
+  "rapidfuzz>=3.6",
+  # anthropic: Tier 2 LLM classification. Optional at runtime — the alert
+  # path degrades to Tier 1 without it (AGENTS.md constraint 6).
+  "anthropic>=0.40",
+  # httpx: async HTTP for the Pushover alert channel.
+  "httpx>=0.27",
+  # fastapi + uvicorn + jinja2: the incident-record web app, a separate
+  # process that only reads the store (docs/architecture.md §5.10).
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+  "jinja2>=3.1",
+  # python-multipart: FastAPI's form parsing (ack/feedback/annotation forms)
+  "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "ruff>=0.4",
+  "mypy>=1.10",
+]
+# ASR engines are platform extras (docs/conventions.md §5): mlx-whisper is
+# Apple-Silicon-only and materially faster there; faster-whisper is the
+# portable deployment default. Selected by [asr].engine in config, never by
+# platform sniffing.
+macos = ["mlx-whisper>=0.4"]
+linux = ["faster-whisper>=1.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vhfwatch"]
+
+[tool.ruff]
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# Defaults plus: import sorting (I), pyupgrade (UP), common bug patterns (B).
+extend-select = ["I", "UP", "B"]
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+explicit_package_bases = true
+
+# Audio/ML libraries that ship no type stubs. Calls into them are still
+# checked against our annotations; only their internals go unchecked.
+[[tool.mypy.overrides]]
+module = ["sounddevice", "soxr", "mlx_whisper", "faster_whisper"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
