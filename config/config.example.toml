@@ -19,8 +19,12 @@ source            = "live"     # "live" | "file" | "directory"
 # Run scripts/audio_devices.py to see exact names.
 device            = ""         # substring match on input device name; "" = system default
 input_channels    = 2          # both interfaces present 2 in
-use_channel       = 0          # NEVER average channels — mixing with a silent
-                               # channel costs 6 dB and breaks VAD calibration
+use_channel       = 0          # PER-MACHINE — set by which jack the radio is in.
+                               # M2: input 1 = 0, input 2 = 1. UCA202: RCA L = 0.
+                               # Wrong value = near-silence that looks exactly
+                               # like a dead adapter. NEVER average channels —
+                               # mixing with a silent channel costs 6 dB and
+                               # breaks VAD calibration
 input_gain_db     = 0.0        # post-capture digital gain. Last resort for rigs
                                # with no hardware trim (UCA202). Can fix "too
                                # quiet"; CANNOT fix clipping. Solve level in the
@@ -31,7 +35,11 @@ blocksize         = 1024
 
 # Run scripts/calibrate.py to measure these. Do not guess.
 [audio.calibration]
-noise_floor_dbfs  = -45.0      # measured with squelch OPEN
+noise_floor_dbfs  = -45.0      # measured with squelch CLOSED, nobody
+                               # transmitting — the gate has to clear the idle
+                               # line, so that is the condition that matters.
+                               # (Squelch-OPEN hiss is for setting the analog
+                               # trim, not for deriving this number.)
 drift_warn_db     = 6.0        # warn if noise floor moves more than this
 
 [segmenter]

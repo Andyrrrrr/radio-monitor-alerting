@@ -1,7 +1,7 @@
 {
-  "_readme": "Machine-readable project status. Read this at the start of a session to orient; update it at the end of any task that changes what's built or what's broken. Prose belongs in the docs — this file is the ledger. Status values: not_started | in_progress | complete | blocked.",
-  "last_updated": "2026-08-10",
-  "current_phase": "POC code complete — next steps need hardware and corpus, not code",
+  "_readme": "Machine-readable project status. Read this at the start of a session to orient; update it at the end of any task that changes what's built or what's broken. Prose belongs in the docs \u2014 this file is the ledger. Status values: not_started | in_progress | complete | blocked.",
+  "last_updated": "2026-08-12",
+  "current_phase": "M2 rig audio chain verified and calibrated (docs/hardware.md \u00a75 steps 3-5). Next: \u00a75 step 6 \u2014 a 30-minute segmenter run during busy traffic \u2014 and start corpus collection.",
   "phases": {
     "phase_0_skeleton": {
       "status": "complete",
@@ -11,17 +11,17 @@
     "phase_1_transcription_detection": {
       "status": "complete",
       "hardware_required": false,
-      "notes": "All code items landed 2026-08-10: asr/ (mlx + faster_whisper behind Transcriber, warmup at startup), detect/ (hallucination gates, watchword matcher with phonetic guards per D14, LLM classifier with hard graceful degradation, severity resolution per architecture §5.5), incidents/correlator.py, scripts/replay.py + evaluate.py. 113 tests pass; ruff and mypy --strict clean. REMAINING (corpus-dependent, not code): hand-label data/labels.jsonl, run evaluate.py for a precision/recall baseline, and the base.en/small.en/medium.en WER comparison. Note: neither Whisper engine has been exercised against real audio yet — the first `python -m vhfwatch.pipeline --source file --path <wav>` run downloads the model (~500 MB) and is the real smoke test."
+      "notes": "All code items landed 2026-08-10: asr/ (mlx + faster_whisper behind Transcriber, warmup at startup), detect/ (hallucination gates, watchword matcher with phonetic guards per D14, LLM classifier with hard graceful degradation, severity resolution per architecture \u00a75.5), incidents/correlator.py, scripts/replay.py + evaluate.py. 113 tests pass; ruff and mypy --strict clean. REMAINING (corpus-dependent, not code): hand-label data/labels.jsonl, run evaluate.py for a precision/recall baseline, and the base.en/small.en/medium.en WER comparison. Note: neither Whisper engine has been exercised against real audio yet \u2014 the first `python -m vhfwatch.pipeline --source file --path <wav>` run downloads the model (~500 MB) and is the real smoke test."
     },
     "phase_2_live_audio": {
       "status": "in_progress",
       "hardware_required": true,
-      "notes": "All CODE items landed 2026-08-10: LiveAudioSource (device substring select, channel slice, gain warning, reconnect-with-backoff), soxr resampling wrapper, DirectoryAudioSource, calibrate.py, record_corpus.py, noise-floor drift warning, bounded queues with oldest-unflagged drop. NOT verified against hardware — the docs/hardware.md §5 bring-up procedure and the 30-minute segment-count exit criterion still stand between this and 'complete'. Do not debug software before §5 Step 4 passes."
+      "notes": "All CODE items landed 2026-08-10. HARDWARE: docs/hardware.md \u00a75 steps 3, 4 and 5 now PASS on the M2 rig (2026-08-12) \u2014 device selection, channel slice, level, and a clean 30 s recording. Thresholds in Andy's config.toml are measured, not guessed. REMAINING for 'complete': \u00a75 step 6, the 30-minute segment-count exit criterion during busy traffic. Steps 1 (hear traffic by ear) and the \u00a72.1 radio programming spot-check were skipped and should be done before trusting any negative result. Added scripts/level_meter.py this session \u2014 calibrate.py is a batch tool and the wrong shape for setting a trim by hand."
     },
     "phase_3_alerting_and_record": {
       "status": "complete",
       "hardware_required": false,
-      "notes": "Landed 2026-08-10: console/macos/pushover channels behind AlertChannel, router (alert-once-then-update, dedupe, escalation re-alert; no-ack escalation via Pushover priority 2 per D16), offline-complete notification body, share tokens (hash-only storage, access logged), FastAPI web app as a separate process with all §5.10 routes, canvas waveform per D15, honest uncertainty rendering, feedback + annotations. Exit criterion (replayed mayday → Pushover → phone) needs VHFWATCH_PUSHOVER_* set and a phone — untested end-to-end."
+      "notes": "Landed 2026-08-10: console/macos/pushover channels behind AlertChannel, router (alert-once-then-update, dedupe, escalation re-alert; no-ack escalation via Pushover priority 2 per D16), offline-complete notification body, share tokens (hash-only storage, access logged), FastAPI web app as a separate process with all \u00a75.10 routes, canvas waveform per D15, honest uncertainty rendering, feedback + annotations. Exit criterion (replayed mayday \u2192 Pushover \u2192 phone) needs VHFWATCH_PUSHOVER_* set and a phone \u2014 untested end-to-end."
     },
     "phase_4_reliability": {
       "status": "not_started",
@@ -37,21 +37,21 @@
   "parallel_tracks": {
     "corpus_collection": {
       "status": "not_started",
-      "notes": "scripts/record_corpus.py is ready — start it the moment either rig's audio chain works. This is the highest-value background activity and every Phase 1 measurement is blocked on it."
+      "notes": "UNBLOCKED as of 2026-08-12 \u2014 the M2 rig's audio chain is verified and calibrated, so scripts/record_corpus.py can run now. This is the highest-value background activity and every Phase 1 measurement is blocked on it."
     },
     "bringup_log": {
-      "status": "not_started",
-      "notes": "docs/bringup-log.md is an empty template. No session has been recorded for either rig."
+      "status": "in_progress",
+      "notes": "First entry written 2026-08-12 for the M2 rig. Knob positions still missing."
     }
   },
   "rigs": {
     "andy_m2": {
       "interface": "MOTU M2",
-      "audio_chain_verified": false,
-      "calibrated": false,
-      "noise_floor_dbfs": null,
-      "open_threshold_db": null,
-      "notes": "Has a hardware input trim. Watch for the balanced-input phase-cancellation trap (docs/hardware.md §3.4)."
+      "audio_chain_verified": true,
+      "calibrated": true,
+      "noise_floor_dbfs": -68.1,
+      "open_threshold_db": -58.1,
+      "notes": "Verified and calibrated 2026-08-12. Radio on M2 INPUT 2, so use_channel = 1 (input 1 carries Andy's XLR mic). Connected via Thunderbolt dock, which measured 12 dB quieter in the voice band than direct USB-C - keep the dock. SETTLED GAIN STAGING: radio volume 3/4, M2 input 2 trim 90 deg, which inverts hardware.md 3.5's default for a measured reason (docs/decisions.md D18). At that setting: speech peaks -7.6 dBFS, zero clipped samples, idle floor -68.1 dBFS - measured twice either side of a failed re-staging experiment and reproducible to 0.3 dB by hand. 60 Hz pickup on the idle line is self-cancelling and deliberately unfiltered (D17). Knobs still need physically taping. No squelch control on this radio; no macOS input slider exists for the M2."
     },
     "parker_uca202": {
       "interface": "Behringer UCA202",
@@ -59,12 +59,12 @@
       "calibrated": false,
       "noise_floor_dbfs": null,
       "open_threshold_db": null,
-      "notes": "No hardware input trim — the front knob is headphone output only. The radio's volume knob may be the only analog control, with input_gain_db as a post-capture last resort."
+      "notes": "No hardware input trim \u2014 the front knob is headphone output only. The radio's volume knob may be the only analog control, with input_gain_db as a post-capture last resort."
     }
   },
   "known_issues": [
     {
-      "description": "The clips in audio-test-samples/ (and their 16 kHz conversions in data/corpus/) were recorded from the radio's speaker through a laptop mic, NOT through the line-in chain. They are useful only as smoke-test input for the pipeline. Do not tune segmenter thresholds against them, do not treat their noise floors (-60 to -77 dBFS) as representative, and do not use them for the Phase 1 WER comparison — wait for real line-in corpus audio.",
+      "description": "The clips in audio-test-samples/ (and their 16 kHz conversions in data/corpus/) were recorded from the radio's speaker through a laptop mic, NOT through the line-in chain. They are useful only as smoke-test input for the pipeline. Do not tune segmenter thresholds against them, do not treat their noise floors (-60 to -77 dBFS) as representative, and do not use them for the Phase 1 WER comparison \u2014 wait for real line-in corpus audio.",
       "severity": "informational"
     },
     {
@@ -72,15 +72,15 @@
       "severity": "medium"
     },
     {
-      "description": "LiveAudioSource's disconnect/reconnect path is untested against a real USB unplug — it needs a deliberate yank test during bring-up.",
+      "description": "LiveAudioSource's disconnect/reconnect path is untested against a real USB unplug \u2014 it needs a deliberate yank test during bring-up.",
       "severity": "medium"
     },
     {
-      "description": "Neither rig's audio chain has been verified end to end. All segmenter thresholds are starting guesses derived from theory until scripts/calibrate.py runs on real hardware.",
+      "description": "Parker's UCA202 rig has never been verified end to end, and its thresholds are still theory-derived guesses. Andy's M2 rig was verified and calibrated 2026-08-12. Calibration does not transfer between rigs (docs/decisions.md D11).",
       "severity": "medium"
     },
     {
-      "description": "Pushover delivery is untested (needs VHFWATCH_PUSHOVER_TOKEN/USER and a phone). The Phase 3 exit criterion — alert deep link opens a playable incident record on a phone — has not been walked end to end.",
+      "description": "Pushover delivery is untested (needs VHFWATCH_PUSHOVER_TOKEN/USER and a phone). The Phase 3 exit criterion \u2014 alert deep link opens a playable incident record on a phone \u2014 has not been walked end to end.",
       "severity": "medium"
     },
     {
@@ -92,11 +92,43 @@
       "severity": "low"
     },
     {
-      "description": "The web app's 'dropped segments' honesty indicator is absent — nothing persists queue drops or pre-ASR rejects yet. Lands with Phase 4 health events.",
+      "description": "The web app's 'dropped segments' honesty indicator is absent \u2014 nothing persists queue drops or pre-ASR rejects yet. Lands with Phase 4 health events.",
       "severity": "low"
+    },
+    {
+      "description": "Andy's M2 knobs are at the settled setting (radio volume 3/4, M2 input 2 trim 90 deg; docs/decisions.md D18) and re-verified, but are NOT physically taped. A bump silently invalidates open_threshold_db, and the pipeline's noise-floor drift warning is the only thing that would catch it.",
+      "severity": "low"
+    },
+    {
+      "description": "The M2 measured 12 dB quieter in the voice band through the Thunderbolt dock than connected directly to the laptop on battery, with identical mains content. Reproducible but unexplained; suspected USB power-rail switching noise reaching the bus-powered interface. Keep the dock. Matters because it means the audio chain has a 12 dB failure mode triggered by nothing more than re-plugging a cable.",
+      "severity": "low"
+    },
+    {
+      "description": "TX inhibit is unverified on Andy's monitoring NX-5200 and is deliberately untested, since testing it means transmitting. Do not press PTT on the monitoring radio. Modulation, bandwidth and tone squelch are owner-confirmed correct as of 2026-08-12.",
+      "severity": "low"
+    },
+    {
+      "description": "Gain staging on the M2 rig inverts docs/hardware.md 3.5's default ordering, and this is measured, not preference: the 60 Hz interference is picked up on the cable downstream of the radio's volume knob, so the interface trim cannot improve SNR. Moving gain from radio to interface raised the idle floor from -68.4 to -38.0 dBFS and caused clipping. Radio high / trim low is correct here (docs/decisions.md D18). Anyone 'fixing' this back to 1/3 radio volume will silently break detection.",
+      "severity": "medium"
     }
   ],
-  "verified_on_hardware": [],
+  "verified_on_hardware": [
+    {
+      "date": "2026-08-12",
+      "rig": "andy_m2",
+      "what": "docs/hardware.md \u00a75 step 3 \u2014 Mac sees M2 with 2 input channels at 48 kHz. Device index shifted 3->1->3 across reconnects; name-substring matching held, index-based selection would have broken."
+    },
+    {
+      "date": "2026-08-12",
+      "rig": "andy_m2",
+      "what": "docs/hardware.md \u00a75 step 4 \u2014 signal present on the configured channel, phase cancellation ruled out (45 dB idle-to-signal jump), speech peaks -8.4 dBFS with zero clipped samples after trimming down ~10.5 dB."
+    },
+    {
+      "date": "2026-08-12",
+      "rig": "andy_m2",
+      "what": "docs/hardware.md \u00a75 step 5 \u2014 30 s recording verified: no flat line, no clipping. Noise floor -68.4 dBFS, p90 within 0.1 dB."
+    }
+  ],
   "open_questions": [
     "What is the actual traffic volume on Ch 16 at the POC site? This sets the 'no transmission in N hours' watchdog threshold (Phase 4 starts at 6 hours as a placeholder) and determines whether closed-squelch VAD is leaving too much on the table."
   ]
