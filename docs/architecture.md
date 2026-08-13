@@ -256,7 +256,9 @@ Implementations:
 
 Capture at the device's native rate (usually 48 kHz), resample to **16 kHz mono float32** for everything downstream. Whisper wants 16 kHz; marine VHF audio is ~3 kHz bandwidth, so nothing is lost. Implemented as `ResamplingAudioSource` (`audio/resample.py`, streaming `soxr`) wrapping any source, so the pipeline sees 16 kHz frames whether the input is a 48 kHz live stream or an already-16 kHz fixture.
 
-**Both supported interfaces present 2 input channels.** Slice `use_channel` (default 0); never average, or you lose 6 dB when the other channel is silent and invalidate the VAD calibration.
+**Both supported interfaces present 2 input channels.** Slice `use_channel`; never average, or you lose 6 dB when the other channel is silent and invalidate the VAD calibration. The correct value is per-rig and set by which physical jack the radio is in — see `docs/hardware.md` §3.7.
+
+**`use_channel` describes the capture device, not files.** `record_corpus.py` writes **mono** WAVs with the slice already applied, so `FileAudioSource` ignores `channel` for mono input (logging `file.mono_ignoring_channel`). Without that, a rig configured with `use_channel = 1` could not replay the corpus it recorded itself. An out-of-range channel on a genuinely multi-channel file still fails loudly.
 
 **Apply `input_gain_db` after capture, before segmentation.** This exists for rigs with no hardware input trim (Behringer UCA202). It can raise a too-quiet signal; it cannot undo clipping. Log a warning at startup if `input_gain_db` exceeds ~12 dB — that indicates an analog problem that should be fixed upstream.
 

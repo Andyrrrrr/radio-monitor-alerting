@@ -190,7 +190,10 @@ Parker's radio has Bluetooth. It is not a viable audio path. Recorded here so it
 
 **A handheld with a rubber-duck antenna on a desk indoors will hear very little marine traffic.** VHF is line-of-sight and range scales with antenna height. A stock portable antenna at desk height inside a building may hear only strong nearby stations.
 
+**This happened, on the first rig, on day one.** As of 2026-08-12 Andy's house cannot receive Ch 16 at all with the stock antenna indoors — only a rebroadcast fire channel comes in. Treat the warnings below as a description of the likely outcome, not a hypothetical (`docs/bringup-log.md` 2026-08-12).
+
 - **Do not conclude the software is broken when the radio simply can't hear anything.** Verify reception by ear during a busy period. If you hear nothing with earphones, no code will help.
+- **A strong local rebroadcast is a fine segmenter test and a poor sensitivity test.** Fully-quieting audio validates the VAD logic but tells you nothing about the weak distant signals of §3.6. Don't promote "segmentation works" to "we'd hear a mayday".
 - **Free wins:** radio next to or outside a window, as high as possible, away from computers and switching power supplies.
 - **Best $25 in the project:** the NX-5000 series uses an **SMA** antenna connector. A telescopic whip or mag-mount with an SMA adapter, in a window with a view of the water, dramatically outperforms the stock duck.
 - If reception is poor where you're developing, **record the corpus somewhere with a better view of the water** even if that's not where the system will live. The corpus needs representative signal quality; you can relocate.

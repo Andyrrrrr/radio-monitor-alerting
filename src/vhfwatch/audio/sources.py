@@ -68,6 +68,10 @@ class FileAudioSource:
     the synthetic fixtures produce, and it keeps us on the stdlib `wave`
     module. If other formats show up, that's the moment to add `soundfile`
     (Phase 2, alongside live capture) — not to hand-roll 24-bit unpacking.
+
+    `channel` is ignored for mono files. Corpus WAVs are written mono with
+    the capture channel already sliced, so a rig configured with
+    `use_channel = 1` would otherwise be unable to replay its own corpus.
     """
 
     def __init__(
@@ -93,11 +97,27 @@ class FileAudioSource:
                 "re-export the file or wait for soundfile support in Phase 2"
             )
         self._channels = self._wav.getnchannels()
-        if channel >= self._channels:
+        if self._channels == 1 and channel != 0:
+            # `use_channel` describes the capture DEVICE's channel layout,
+            # not a file's. record_corpus.py already applied the slice when
+            # it wrote the file, so a mono corpus recorded on a rig with
+            # use_channel = 1 (e.g. a radio on MOTU M2 input 2) must not be
+            # asked for channel 1 again here — there is only one channel to
+            # read. Log it rather than failing: refusing would make a rig's
+            # own corpus unreplayable on the rig that recorded it.
+            logger.info(
+                "file.mono_ignoring_channel",
+                file=self._path.name,
+                requested_channel=channel,
+                reason="file is mono; use_channel applies to live capture only",
+            )
+            channel = 0
+        elif channel >= self._channels:
             raise ValueError(
                 f"{self._path}: channel {channel} requested but file has "
                 f"{self._channels} channel(s)"
             )
+        self._channel = channel
         self.name = f"file:{self._path.name}"
         self.sample_rate = self._wav.getframerate()
 

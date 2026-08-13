@@ -1,7 +1,7 @@
 {
   "_readme": "Machine-readable project status. Read this at the start of a session to orient; update it at the end of any task that changes what's built or what's broken. Prose belongs in the docs \u2014 this file is the ledger. Status values: not_started | in_progress | complete | blocked.",
   "last_updated": "2026-08-12",
-  "current_phase": "M2 rig audio chain verified and calibrated (docs/hardware.md \u00a75 steps 3-5). Next: \u00a75 step 6 \u2014 a 30-minute segmenter run during busy traffic \u2014 and start corpus collection.",
+  "current_phase": "M2 rig verified and calibrated. Marine Ch 16 is NOT receivable at the POC site (antenna/siting, see hardware.md 4) - Phase 2's segmenter exit criterion will run against rebroadcast fire traffic instead, which validates segmentation logic but not weak-signal sensitivity. An antenna is now the project's highest-value action.",
   "phases": {
     "phase_0_skeleton": {
       "status": "complete",
@@ -36,8 +36,8 @@
   },
   "parallel_tracks": {
     "corpus_collection": {
-      "status": "not_started",
-      "notes": "UNBLOCKED as of 2026-08-12 \u2014 the M2 rig's audio chain is verified and calibrated, so scripts/record_corpus.py can run now. This is the highest-value background activity and every Phase 1 measurement is blocked on it."
+      "status": "blocked",
+      "notes": "BLOCKED for MARINE audio as of 2026-08-12: Ch 16 is not receivable at Andy's house with the stock antenna indoors. Fire traffic rebroadcast on the radio's 'Forge ch 3' memory IS receivable and will be recorded to data/corpus-fire/ (kept separate so it never contaminates marine tuning, labelling or evaluate.py runs). Fire/EMS audio is more sensitive than marine chatter - addresses and patient details are plausible - so do not share it as freely as the docs encourage for marine corpus. Marine corpus needs a better antenna or a better-sited recording location."
     },
     "bringup_log": {
       "status": "in_progress",
@@ -110,6 +110,14 @@
     {
       "description": "Gain staging on the M2 rig inverts docs/hardware.md 3.5's default ordering, and this is measured, not preference: the 60 Hz interference is picked up on the cable downstream of the radio's volume knob, so the interface trim cannot improve SNR. Moving gain from radio to interface raised the idle floor from -68.4 to -38.0 dBFS and caused clipping. Radio high / trim low is correct here (docs/decisions.md D18). Anyone 'fixing' this back to 1/3 radio volume will silently break detection.",
       "severity": "medium"
+    },
+    {
+      "description": "Marine Ch 16 is not receivable at the POC site (Andy's house, stock rubber duck indoors), confirming the hardware.md 4 warning. The system cannot currently do its actual job at this location no matter how well the pipeline works. Highest-value fix is an antenna (telescopic whip or mag-mount + SMA adapter, in a window with a view of the water), or recording the marine corpus somewhere better sited.",
+      "severity": "high"
+    },
+    {
+      "description": "Segmenter verification will run against strong rebroadcast fire traffic, not marine traffic. This validates segmentation LOGIC (thresholds, hang time, pre-roll, fragmentation) but NOT weak-signal sensitivity: a central-station rebroadcast arrives fully quieting while a distant vessel does not. Do not promote 'segmentation works' to 'we would hear a mayday'. Also note 'mayday' is standard fireground vocabulary for a firefighter in trouble, so watchword hits on this corpus are not false positives in the marine sense, and the marine-loaded ASR initial_prompt may hurt WER here.",
+      "severity": "medium"
     }
   ],
   "verified_on_hardware": [
@@ -130,6 +138,7 @@
     }
   ],
   "open_questions": [
-    "What is the actual traffic volume on Ch 16 at the POC site? This sets the 'no transmission in N hours' watchdog threshold (Phase 4 starts at 6 hours as a placeholder) and determines whether closed-squelch VAD is leaving too much on the table."
+    "What is the actual traffic volume on Ch 16 at a site that can RECEIVE it? Unanswerable at the current location. Still sets the Phase 4 'no transmission in N hours' watchdog threshold (placeholder 6 hours) and determines whether closed-squelch VAD leaves too much on the table.",
+    "Will an external antenna make Ch 16 receivable at Andy's house, or does the POC need to run somewhere else entirely?"
   ]
 }

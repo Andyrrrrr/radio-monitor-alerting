@@ -183,6 +183,22 @@ Radio-stage distortion at 3/4 remains **unmeasured** — quantifying THD on spee
 
 **A new operator tool was added:** `scripts/level_meter.py`. `calibrate.py` is a fixed-length batch, which is the wrong shape for setting a knob — you need live feedback. The meter shows rms/peak/latched-max plus the voice and mains bands separately, and prints a plain-language verdict on exit.
 
+### Reception at this site — §4's warning confirmed
+
+**Marine Ch 16 traffic is not receivable from Andy's house** with the stock rubber duck indoors. This is exactly what `docs/hardware.md` §4 predicted, and it is a hardware/siting limitation, not a software one.
+
+What *is* receivable: **fire-department traffic rebroadcast from a large central station, on the radio's "Forge ch 3" memory.** Strong and reliable.
+
+Consequences:
+
+- **Phase 2's exit criterion can proceed on fire traffic.** Segmentation is audio-energy VAD and is indifferent to vocabulary; squelch-gated FM voice is squelch-gated FM voice. It exercises thresholds, hang time, pre-roll and fragmentation for real, and doubles as the first-ever real-audio ASR smoke test.
+- **It does NOT validate weak-signal sensitivity.** A central-station rebroadcast arrives fully quieting; a distant small vessel is the opposite, and that's the class §3.6 says is easiest to lose. Segmentation *logic* verified ≠ sensitivity proven.
+- **It does NOT validate the detector, and misreads easily.** "Mayday" is standard fireground vocabulary for a firefighter in trouble, so watchwords can legitimately fire on this traffic. Do not treat those as false-positive measurements — it's a different vocabulary domain. The marine-loaded `initial_prompt` may also hurt WER here.
+- **Marine corpus collection is blocked at this site.** Store fire audio in a separate directory (`data/corpus-fire/`) so it never contaminates marine tuning, labelling, or `evaluate.py` runs.
+- **Fire/EMS traffic is more sensitive than marine chatter** — addresses and patient details are plausible. `data/` is gitignored (constraint 8), and this corpus should not be shared as freely as the docs encourage for marine audio.
+
+**The highest-value action for the project is now an antenna, not code** — §4's "best $25 in the project": a telescopic whip or mag-mount with an SMA adapter, in a window with a view of the water. Failing that, record the marine corpus somewhere with better siting even if that's not where the system will live. No software change competes with this.
+
 ### What changed since last session
 
 First session. Before this, no rig had been verified at all.

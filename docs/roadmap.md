@@ -67,6 +67,8 @@ Hardware enters. Work through the verification procedure in `docs/hardware.md` �
 
 **Exit:** the radio parked on Ch 16 produces segmented transmissions that appear in the database with sane boundaries, and a 30-minute run's segment count roughly matches what you heard by ear.
 
+**Amended 2026-08-12:** Ch 16 is not receivable at the POC site (`docs/hardware.md` §4), so this criterion will be met against **rebroadcast fire traffic** instead. Preferred method, better than the live procedure: record a corpus, establish ground truth by listening to the *recording*, then replay the same file through the pipeline — deterministic and repeatable across threshold changes, which live audio can never be. Pick the window by clock time, never by where the segmenter found segments, or you can't measure what it missed. This validates segmentation logic, **not** weak-signal sensitivity.
+
 ---
 
 ## Phase 3 — Alerting and the incident record
