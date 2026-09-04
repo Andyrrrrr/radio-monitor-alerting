@@ -227,3 +227,73 @@ already acknowledged-aware.
 **Revisit when:** a second real alerting channel (e.g. the GPIO buzzer)
 needs escalation semantics of its own — that's when a router-level
 mechanism earns its complexity.
+
+---
+
+## D17 — No high-pass filter on the capture path; the mains pickup is self-cancelling
+
+**Decided during the 2026-08-12 M2 bring-up**, after measuring rather than
+assuming. The idle line carries 60 Hz pickup roughly 16 dB above the voice
+band, which inflates `calibrate.py`'s full-band noise floor and therefore
+the derived `open_threshold_db`. A 200 Hz high-pass would remove it — and
+we're not adding one.
+
+**Why:** the hum is present *only when there is no signal.* With the
+squelch closed the radio's output stage isn't driving the line, so it
+floats and picks up the room's 60 Hz field; the moment the squelch opens
+the amp drives it at low impedance and the pickup vanishes (measured at
+−92 dB or lower, versus −65 dB idle, across three independent runs). It is
+exactly anti-correlated with the thing being detected, so it can never
+mask speech or cost real sensitivity. The full-band floor is also the
+*correct* reference for a gate that has to clear the idle line.
+
+Filtering would have added a config knob, a divergence between the level
+the VAD sees and the level of the archived audio, and a DSP stage this team
+would have to maintain — to solve a problem that measurement showed does
+not exist. Note the first instinct here was wrong: the hum *looked* like it
+was costing ~11 dB until its behaviour during transmission was checked.
+
+**Revisit when:** a rig shows mains pickup that *persists through a
+transmission* (a mains-powered base station, or a genuine ground loop —
+§3.5's isolation-transformer case). Then the hum does compete with speech,
+and a filter, or better an isolation transformer, is warranted. Also
+revisit if open-squelch monitoring is ever adopted (§3.6), since a
+continuously driven line behaves differently.
+
+---
+
+## D18 — On the M2 rig, gain staging is radio-high / trim-low, inverting §3.5's default
+
+**Decided 2026-08-12, after measuring both splits.** `docs/hardware.md` §3.5
+says to set the radio to roughly 1/3 and make up the level at the interface,
+to keep the radio's speaker amp out of distortion. **On Andy's M2 rig that
+advice is wrong and was measured to be wrong:** the correct setting is radio
+volume **3/4** with the M2 input 2 trim at **90°**.
+
+**Why:** the dominant noise on this rig is 60 Hz pickup induced on the cable,
+which enters the chain *downstream of the radio's volume control.* The
+interface trim therefore amplifies signal and pickup by the same amount and
+cannot improve SNR; the radio's volume knob is the only stage that moves
+signal without moving the interference. Shifting gain from the radio to the
+interface raised the idle noise floor from **−68.4 to −38.0 dBFS** (+30 dB,
+matched by +31 dB in both the mains and voice bands) while speech rose only
+~8 dB, and introduced clipping (593 samples at full scale).
+
+That floor is not merely untidy — it is disqualifying. At −38 dBFS the
+derived `open_threshold_db` is −28, which lands *inside* the observed speech
+range of −25 to −40 dBFS RMS, so the gate would miss a large fraction of
+transmissions. At −68.4 every measured speech second cleared the threshold by
+10 dB or more.
+
+The distortion risk that motivated §3.5's ordering is real in general but
+remains **unmeasured** on this radio at 3/4 volume; quantifying THD on speech
+is awkward, which is why the guidance was precautionary in the first place. A
+measured 30 dB penalty outweighs a hypothetical one.
+
+**Revisit when:** the interference source is eliminated (a different cable
+route, a shielded or balanced connection, an isolation transformer), at which
+point the radio's own amp becomes the noisiest stage again and §3.5's default
+ordering applies. Also revisit if transcription on strong local signals is
+unexpectedly mushy with no other explanation — that would be the first actual
+evidence of radio-stage distortion, and the fix is a *modest* reduction with
+recalibration, not a wholesale shift of gain to the interface.

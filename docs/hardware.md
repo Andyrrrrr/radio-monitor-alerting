@@ -13,7 +13,8 @@ Development happens on two different audio front-ends. **This is supported delib
 | Radio | Kenwood NX-5200 | Kenwood NX-5200 |
 | Adapter | multi-pin → K1 2-pin | multi-pin → K1 2-pin |
 | Cable | 3.5 mm TRS → dual 1/4" **TS** | 3.5 mm TRS → dual **RCA** |
-| Interface | **MOTU M2**, input 1, 1/4" line | **Behringer UCA202**, RCA L/R |
+| Interface | **MOTU M2**, input **2**, 1/4" line | **Behringer UCA202**, RCA L/R |
+| Capture channel (`use_channel`) | **1** (M2 in 1 = ch 0, in 2 = ch 1) | 0 |
 | Input type | Balanced TRS (**cancellation risk**, §3.4) | Unbalanced RCA (no such risk) |
 | Hardware input trim | Yes, per-channel knob | **No** — fixed line level |
 | Metering | Front-panel LCD | None |
@@ -34,7 +35,9 @@ Development happens on two different audio front-ends. **This is supported delib
 
 ### 2.1 Spot-check the existing programming
 
-A mismatch here produces symptoms that look exactly like software bugs, so verify once:
+A mismatch here produces symptoms that look exactly like software bugs, so verify once.
+
+**You probably can't check these directly** — that needs the dealer programming software (§2.3), which is Windows-only and not freely available. **The by-ear listening test (§5 Step 1) verifies three of the four for free:** if you hear clear marine voice on Ch 16, then modulation, bandwidth, and tone squelch are all necessarily correct, because a wrong mode gives silence, narrow bandwidth gives quiet distorted audio, and any tone squelch mutes everything. **TX inhibit is the exception, and must not be tested by transmitting** — just never press PTT on the monitoring radio.
 
 | Setting | Required value | Why |
 |---|---|---|
@@ -92,12 +95,16 @@ The UCA202 is 16-bit/48 kHz. Irrelevant here — marine VHF audio is ~3 kHz band
 ```
 NX-5200 → [K1 adapter] → 3.5 mm TRS out
   └─ [3.5 mm TRS → dual 1/4" TS Y-cable, ONE leg used]
-       └─ MOTU M2, input 1, 1/4" jack (line, NOT XLR)
+       └─ MOTU M2, input 2, 1/4" jack (line, NOT XLR)
             └─ USB-C → MacBook → Core Audio, 48 kHz, 2-in
-                 └─ sounddevice, CHANNEL 0 ONLY
+                 └─ sounddevice, CHANNEL 1 ONLY (use_channel = 1)
 ```
 
-M2 settings: **1/4" input, not XLR** (the XLR path is a mic preamp expecting millivolts and will be slammed even at minimum gain). Phantom power **off**. Hi-Z/instrument **off**. 48 kHz in Audio MIDI Setup. Front-panel meters make level setting direct — use them.
+**Input 2, not input 1, on this rig.** Input 1 carries Andy's XLR mic and stays where it is. The physical jack determines the capture channel: **M2 input 1 = channel 0, input 2 = channel 1.** Set `use_channel` to match, and set the trim on the strip the radio is actually plugged into — the M2's trims are per-channel.
+
+Phantom power is only present on the XLR contacts of a combo jack, never the 1/4" contacts, so a phantom-powered condenser on input 1 cannot harm the radio connection on input 2.
+
+M2 settings: **1/4" input, not XLR** (the XLR path is a mic preamp expecting millivolts and will be slammed even at minimum gain). Phantom power **off** on the radio's channel. Hi-Z/instrument **off**. 48 kHz in Audio MIDI Setup. Front-panel meters make level setting direct — use them.
 
 Bonus: the M2's **loopback** lets you play a recorded distress call out of the Mac and back through the real audio input path for end-to-end testing without transmitting.
 
@@ -107,13 +114,15 @@ Bonus: the M2's **loopback** lets you play a recorded distress call out of the M
 
 This looks exactly like a broken adapter or a radio that isn't receiving. It is the most likely failure on the M2 rig.
 
-**Avoid it with an unbalanced mono connection:** use a **3.5 mm TRS → dual 1/4" TS** Y-cable and plug **one leg** into input 1. A TS plug shorts ring to sleeve, so the M2 sees tip minus ground = your signal. Do **not** use a 3.5 mm TRS → 1/4" TRS cable.
+**Avoid it with an unbalanced mono connection:** use a **3.5 mm TRS → dual 1/4" TS** Y-cable and plug **one leg** into the radio's input (input 2 on Andy's rig). A TS plug shorts ring to sleeve, so the M2 sees tip minus ground = your signal. Do **not** use a 3.5 mm TRS → 1/4" TRS cable.
 
 **This does not apply to the UCA202.** RCA is unbalanced by construction.
 
 ### 3.5 Gain structure and calibration
 
 **On the UCA202 rig the radio's volume knob may be your only gain control.** The UCA202 has no input trim, and macOS may grey out the input volume slider for devices that don't expose software-controllable input gain. Check System Settings → Sound → Input; if the slider is adjustable, that's a usable second stage, if not, the radio knob is it.
+
+**Confirmed 2026-08-12 on the M2:** macOS shows *no* input slider for it at all. That's fine on this rig — the hardware trim is the real gain stage — and it means there's no software slider to be reset by a reboot. Don't go looking for one.
 
 For that case the pipeline provides a software gain stage:
 
@@ -128,12 +137,16 @@ input_gain_db = 0.0   # post-capture digital gain
 
 1. Select the interface as the Mac's input. Confirm the app sees it and reports 2 input channels: `python scripts/audio_devices.py`.
 2. Set 48 kHz in Audio MIDI Setup.
-3. Open squelch (§3.6) for continuous noise to work against.
+3. Get a steady signal to set the trim against — **squelch open** (§3.6) for continuous hiss, or, if your radio has no squelch control, a **keyed transmission from a second radio on a channel you're licensed for** (§5 Step 4). Note these two conditions produce different targets: hiss at −45 to −35 dBFS, speech peaks at −12 to −6.
 4. **Radio volume to roughly 1/3** and adjust from there. Radio speaker amps distort when driven hard, and distortion introduced at the radio cannot be undone downstream — it degrades transcription more than low level does. Keep the radio clean.
+
+   ⚠️ **This ordering assumes the radio is the noisiest stage. Check that before applying it.** If your rig picks up interference on the *cable* — downstream of the radio's volume knob, as the M2 rig does (§3.4 territory, 60 Hz pickup on a muted output) — then the interface trim amplifies signal and interference equally, and the radio's volume is the *only* control that improves SNR. On such a rig the correct staging is the opposite: **radio as high as it goes without distorting, trim as low as will avoid clipping.** Moving gain from the radio to the interface cost the M2 rig **30 dB of noise floor** for 8 dB of signal (`docs/bringup-log.md` 2026-08-12, `docs/decisions.md` D18). Decide which stage dominates by measuring the idle floor at two different splits, not by assuming.
 5. On the M2, bring up input 1 trim while watching the meters. On the UCA202, adjust the radio knob (and the macOS slider if available) while watching levels in `scripts/calibrate.py`.
 6. Target: **open-squelch noise around −45 to −35 dBFS**, **speech peaks −12 to −6 dBFS**, never touching 0.
 7. **Tape every knob you set.** Radio volume, and M2 trim if applicable. Bumping one degrades detection silently.
-8. Record the measured noise floor in `config.toml` so the VAD threshold derives from measurement, not a guess. Also record the macOS input slider position in the bring-up log — it doesn't always survive reboots or device reconnects.
+8. **Measure the noise floor with squelch CLOSED and nobody transmitting** (`scripts/calibrate.py`), and record it in `config.toml` so the VAD threshold derives from measurement, not a guess. Closed is the condition that matters: the gate's job is to clear whatever the line does when there's no signal. Squelch-open hiss is a trim-setting signal, not a floor. Also record the macOS input slider position in the bring-up log — it doesn't always survive reboots or device reconnects.
+
+   `calibrate.py` measures **full-band** RMS, which will include any mains pickup on an idle line. That's correct for a gate threshold, and don't "fix" it with a filter without checking the hum's behaviour first — on the M2 rig the pickup vanishes entirely when the squelch opens (the radio's output stage drives the line and shorts it out), so it can never mask speech. See `docs/bringup-log.md` 2026-08-12.
 9. Add a startup check that measures noise floor and warns on >6 dB drift from the calibrated value. Cheap, and it catches a bumped knob, a half-inserted plug, a dead battery, and a reset slider.
 
 Clipping is the enemy. It destroys transcription accuracy far more than low level does.
@@ -154,9 +167,18 @@ With a physical radio you have **no access to RSSI**, so signal-strength gating 
 
 ### 3.7 Software gotcha: channel selection
 
-Both interfaces present as **2-in devices**. Depending on the cable and the radio's output wiring, signal may be on channel 0 only, or duplicated on both.
+Both interfaces present as **2-in devices**. Which channel carries the radio depends on the physical jack you used and on the radio's output wiring — it may be one channel only, or duplicated on both.
 
-**Select channel 0 explicitly. Never average or mix the two channels.** If only one channel carries signal, mixing it with a silent one costs 6 dB and will quietly invalidate every VAD threshold you calibrated. Open the stream with `channels=2` and slice channel 0.
+**Slice exactly one channel, chosen by config (`use_channel`). Never average or mix the two.** Mixing a live channel with a silent one costs 6 dB and will quietly invalidate every VAD threshold you calibrated. Open the stream with `channels=2` and slice `use_channel`.
+
+Channel mapping, per rig:
+
+| Rig | Physical input | `use_channel` |
+|---|---|---|
+| Andy / M2 | input 2 (input 1 = his XLR mic) | **1** |
+| Parker / UCA202 | RCA left | **0** |
+
+A wrong `use_channel` produces near-silence, which is indistinguishable by symptom from a dead adapter, a closed squelch, or the §3.4 phase-cancellation trap. Rule it out first — it's the cheapest of the four to check. §5 Step 4b (level drops when you close squelch) is what proves you're on the right channel.
 
 ### 3.8 Rejected: Bluetooth
 
@@ -168,7 +190,10 @@ Parker's radio has Bluetooth. It is not a viable audio path. Recorded here so it
 
 **A handheld with a rubber-duck antenna on a desk indoors will hear very little marine traffic.** VHF is line-of-sight and range scales with antenna height. A stock portable antenna at desk height inside a building may hear only strong nearby stations.
 
+**This happened, on the first rig, on day one.** As of 2026-08-12 Andy's house cannot receive Ch 16 at all with the stock antenna indoors — only a rebroadcast fire channel comes in. Treat the warnings below as a description of the likely outcome, not a hypothetical (`docs/bringup-log.md` 2026-08-12).
+
 - **Do not conclude the software is broken when the radio simply can't hear anything.** Verify reception by ear during a busy period. If you hear nothing with earphones, no code will help.
+- **A strong local rebroadcast is a fine segmenter test and a poor sensitivity test.** Fully-quieting audio validates the VAD logic but tells you nothing about the weak distant signals of §3.6. Don't promote "segmentation works" to "we'd hear a mayday".
 - **Free wins:** radio next to or outside a window, as high as possible, away from computers and switching power supplies.
 - **Best $25 in the project:** the NX-5000 series uses an **SMA** antenna connector. A telescopic whip or mag-mount with an SMA adapter, in a window with a view of the water, dramatically outperforms the stock duck.
 - If reception is poor where you're developing, **record the corpus somewhere with a better view of the water** even if that's not where the system will live. The corpus needs representative signal quality; you can relocate.
@@ -193,11 +218,17 @@ Earphones into the adapter's 3.5 mm output, squelch open.
 `python scripts/audio_devices.py`. Expect the UCA202 or M2 listed with **2 input channels** at 48 kHz.
 ✅ Listed with 2 channels. ❌ Check USB cable, and System Settings → Sound → Input.
 
-**Step 4 — Signal is present and not cancelling.**
-Squelch open, radio ~1/3 volume. Run `scripts/calibrate.py` and watch levels (M2: also watch the front-panel meters).
-✅ Level responds to radio noise and drops when you close squelch.
-❌ **Near-silence at high gain on the M2 rig → phase cancellation** (§3.4). Switch to a TS connection before investigating anything else.
-❌ Near-silence on the UCA202 rig → check cable seating, radio volume, and that you're reading the right channel. Cancellation is not the cause here.
+**Step 4 — Signal is present, on the channel you think, and not cancelling.**
+Radio ~1/3 volume. Run **`scripts/level_meter.py`** — it updates live, so you can set the trim while watching the number, which `calibrate.py` (a fixed-length batch) can't support. M2: also watch the front-panel meters. Use `calibrate.py` afterwards, once the level is right, to derive thresholds.
+
+**If you can't open the squelch**, a keyed transmission from a second radio is a *better* test signal than open-squelch hiss anyway — it's real modulated audio at real levels. **Put both radios on a channel you are licensed to transmit on, never Ch 16** (§2.1, §5 Step 8). An FM receiver's audio output level doesn't depend meaningfully on frequency, so the calibration transfers; return to Ch 16 afterwards **without touching the volume knob or the trim.**
+
+Calibrate the trim against the *loudest* signal you can produce — a nearby radio at full quieting. Real traffic lands below it, and that's the headroom you want.
+✅ **4a:** level responds to radio noise — roughly −45 to −35 dBFS, peak nowhere near 0.
+✅ **4b:** level drops sharply when you close squelch. This is the step that proves `use_channel` matches the jack you plugged into; a level that doesn't move is a channel you aren't listening to.
+❌ **Wrong `use_channel`** → near-silence regardless of gain (§3.7). Cheapest to check, so check it first.
+❌ **Near-silence at high gain on the M2 rig → phase cancellation** (§3.4). Switch to a TS connection.
+❌ Near-silence on the UCA202 rig → check cable seating and radio volume. Cancellation is not the cause here.
 
 **Step 5 — Mac records real radio audio.**
 Record 30 s squelch-open. Inspect the waveform in QuickTime or Audacity.

@@ -55,12 +55,19 @@ Hardware enters. Work through the verification procedure in `docs/hardware.md` �
 - [x] `input_gain_db` applied post-capture, with a startup warning above ~12 dB
 - [x] Native-rate capture → 16 kHz mono float32 resample
 - [x] `scripts/calibrate.py` — measure noise floor, suggest `open_threshold_db`, prints a paste-ready config snippet
+- [x] `scripts/level_meter.py` — live rms/peak/max meter with voice and mains bands split out, for setting the analog trim by hand *(added 2026-08-12; `calibrate.py` is a batch tool and gives no live feedback)*
+- [x] **`docs/hardware.md` §5 steps 3–5 pass on the M2 rig** *(2026-08-12: device and channel confirmed, cancellation ruled out, peaks −8.4 dBFS with zero clipping, floor −68.4 dBFS → measured thresholds in config)*
+- [ ] §5 step 1 — confirm the radio hears traffic by ear, and spot-check the §2.1 programming *(skipped during the first session; do it before diagnosing any missed detection)*
+- [ ] §5 step 6 — 30-minute segmenter run during busy traffic *(the exit criterion below)*
+- [ ] Hardware unplug test for `LiveAudioSource` reconnect
 - [x] Noise-floor drift warning (>6 dB from calibrated value, checked continuously while live)
 - [x] Clipping detection and warning
 - [x] `scripts/record_corpus.py` — continuous timestamped recording, rotating files
 - [x] Bounded queues with oldest-unflagged drop policy and loud logging
 
 **Exit:** the radio parked on Ch 16 produces segmented transmissions that appear in the database with sane boundaries, and a 30-minute run's segment count roughly matches what you heard by ear.
+
+**Amended 2026-08-12:** Ch 16 is not receivable at the POC site (`docs/hardware.md` §4), so this criterion will be met against **rebroadcast fire traffic** instead. Preferred method, better than the live procedure: record a corpus, establish ground truth by listening to the *recording*, then replay the same file through the pipeline — deterministic and repeatable across threshold changes, which live audio can never be. Pick the window by clock time, never by where the segmenter found segments, or you can't measure what it missed. This validates segmentation logic, **not** weak-signal sensitivity.
 
 ---
 

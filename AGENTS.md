@@ -48,7 +48,7 @@ README.md            ← human-facing, including the disclaimer
 config/              ← *.example.toml templates; real config.toml is gitignored
 docs/                ← all reference documentation (see index above)
 src/vhfwatch/        ← the package
-scripts/             ← operator tools: audio_devices, calibrate, record_corpus, replay, evaluate
+scripts/             ← operator tools: audio_devices, level_meter, calibrate, record_corpus, replay, evaluate
 tests/               ← fixtures are synthetic, always
 data/                ← gitignored: audio, corpus, database
 ```
@@ -56,6 +56,12 @@ data/                ← gitignored: audio, corpus, database
 Full module-by-module tree with responsibilities: `docs/architecture.md` §2.
 
 ## Commands
+
+**Every command below needs the venv active.** A bare `python` may resolve to
+Homebrew or miniconda — on Andy's machine it's miniconda — which has none of
+these dependencies and fails with `ModuleNotFoundError: No module named
+'sounddevice'`. Either `source .venv/bin/activate` first, or call
+`.venv/bin/python` directly. Run everything from the repo root.
 
 ```bash
 # Setup (macOS)
@@ -65,6 +71,8 @@ uv pip install -e ".[dev,macos]"
 
 # Hardware bring-up
 python scripts/audio_devices.py            # list input devices
+python scripts/level_meter.py              # LIVE meter — set the analog trim by hand
+python scripts/level_meter.py --record data/bringup/test.wav   # explicit start/stop capture
 python scripts/calibrate.py --seconds 30   # measure noise floor, suggest threshold
 
 # Corpus collection — start this as early as possible
@@ -93,7 +101,7 @@ Each of these cost someone real time. Full reasoning is in the linked docs.
 - **Pre-roll ring buffer is mandatory.** Squelch clips the first syllable. Without ~300 ms of pre-roll, "Mayday" arrives as "ayday" and you've thrown away the detection. (`docs/decisions.md` D5)
 - **Hang time prevents fragmentation.** Without it, "Mayday, mayday, mayday — this is vessel Serenity" becomes five unusable 1-second clips. (`docs/architecture.md` §5.2)
 - **`warmup()` the transcriber at startup.** First-inference model load is multi-second; you don't want that on a real mayday.
-- **Both interfaces present 2 input channels. Select channel 0 explicitly — never average or mix them.** Mixing a live channel with a silent one costs 6 dB and will quietly invalidate every VAD threshold you calibrated. Open with `channels=2` and slice channel 0. (`docs/hardware.md` §3.7)
+- **Both interfaces present 2 input channels. Slice exactly one — the one config says (`use_channel`) — and never average or mix them.** Mixing a live channel with a silent one costs 6 dB and will quietly invalidate every VAD threshold you calibrated. Open with `channels=2` and slice `use_channel`. The right value is per-rig and set by which physical jack the radio is in: **Andy/M2 = 1** (input 2; input 1 is his mic), **Parker/UCA202 = 0**. A wrong value gives near-silence, which mimics a dead adapter. (`docs/hardware.md` §3.7)
 - **Gain differs by rig.** The M2 has a hardware trim; the **UCA202 has none** (its front knob is headphone-output only), so the radio's volume knob may be the only analog control. `input_gain_db` in config is a post-capture digital stage for that case — it can fix "too quiet" but **cannot fix clipping**, which is destructive and upstream. (`docs/hardware.md` §3.5)
 - **Calibration values are per-machine and don't transfer between rigs.** Never hardcode a threshold that came from one person's setup. (`docs/decisions.md` D11)
 - **Program marine channels as analog FM, 25 kHz wide.** The NX-5200 is a digital-capable radio; wrong mode or narrow bandwidth gives quiet, distorted audio and much worse transcription. (`docs/hardware.md` §2.2)
@@ -133,7 +141,7 @@ Before finishing any task:
 1. If you changed architecture, interfaces, or the data model → update `docs/architecture.md`.
 2. If you established a new pattern worth reusing → add it to `docs/conventions.md`.
 3. If you settled a question, or tried something and rejected it → add an entry to `docs/decisions.md`, including what would have to change to make it worth revisiting.
-4. If feature status changed, or you found something broken → update `docs/status.json`.
+4. If feature status changed, or you found something broken → update `docs/status.json`. **Edit it as text in place** — rewriting it with `json.dump` escapes every em dash and `§` unless you pass `ensure_ascii=False`, which silently churns lines you never touched (`docs/conventions.md` §9).
 5. If you completed a roadmap checkbox → tick it in `docs/roadmap.md`.
 6. If you changed hardware settings or ran a calibration → add a dated entry to `docs/bringup-log.md`.
 

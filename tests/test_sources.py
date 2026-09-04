@@ -60,11 +60,28 @@ def test_stereo_slices_requested_channel(tmp_path: Path) -> None:
     assert np.max(np.abs(np.concatenate([f.pcm for f in quiet]))) == 0.0
 
 
-def test_missing_channel_rejected(tmp_path: Path) -> None:
+def test_mono_file_ignores_requested_channel(tmp_path: Path) -> None:
+    # A rig with use_channel = 1 (radio on MOTU M2 input 2) records a MONO
+    # corpus — record_corpus.py already applied the slice. Asking for
+    # channel 1 again must not fail, or the rig cannot replay its own
+    # corpus. Regression test for the bring-up finding of 2026-08-12.
     path = tmp_path / "mono.wav"
-    write_wav16(path, silence(100))
-    with pytest.raises(ValueError, match="channel 1"):
-        FileAudioSource(path, channel=1)
+    write_wav16(path, tone(200, -20.0))
+    got = collect(FileAudioSource(path, channel=1, start_at=BASE))
+    assert np.max(np.abs(np.concatenate([f.pcm for f in got]))) > 0.1
+
+
+def test_out_of_range_channel_on_multichannel_file_rejected(tmp_path: Path) -> None:
+    # Still a real misconfiguration when the file genuinely has channels
+    # and the requested one isn't among them.
+    left = tone(200, -20.0)
+    interleaved = np.empty(len(left) * 2, dtype=np.float32)
+    interleaved[0::2] = left
+    interleaved[1::2] = silence(200)
+    path = tmp_path / "stereo.wav"
+    write_wav16(path, interleaved, channels=2)
+    with pytest.raises(ValueError, match="channel 2"):
+        FileAudioSource(path, channel=2)
 
 
 def test_unsupported_sample_width_rejected(tmp_path: Path) -> None:

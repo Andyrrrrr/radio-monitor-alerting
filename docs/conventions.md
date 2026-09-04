@@ -91,3 +91,18 @@ The common task in this codebase. The recipe:
 ## 8. Dependencies
 
 Prefer the standard library. Every new dependency needs a justification in the commit message covering what it does that stdlib can't and what happens if it goes unmaintained. Platform-specific dependencies go in the `[macos]` / `[linux]` extras, never the base install.
+
+## 9. Editing `docs/status.json`
+
+Every session updates this file, so it is the doc most exposed to careless rewrites.
+
+- **Edit it as text, in place.** Change the strings you need to change and leave the rest alone. It is a hand-maintained ledger, not generated output — no code reads or writes it.
+- **If you must rewrite it programmatically, pass `ensure_ascii=False`.** Python's `json.dump` escapes non-ASCII by default, which turns every `—` and `§` in the file into `—` and `§`. The JSON stays valid and the rendered text is unchanged, so nothing fails — it just silently rewrites dozens of lines you never edited, burying the real change in a diff nobody can review. This happened on 2026-08-12 and had to be undone.
+
+```python
+# The only acceptable form, if in-place text editing genuinely won't do:
+path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+```
+
+- **Check `git diff` before you finish.** If it shows lines you didn't mean to touch, you rewrote the file when you meant to edit it.
+- The same applies to any UTF-8 file in `docs/` — the prose uses em dashes and `§` references throughout.
