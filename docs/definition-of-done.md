@@ -54,7 +54,7 @@ Check this before calling any task complete. It exists because "it works on my m
 - [ ] Architecture, interface, or data-model change → `docs/architecture.md` updated.
 - [ ] New reusable pattern → `docs/conventions.md` updated.
 - [ ] Question settled, or approach tried and rejected → `docs/decisions.md` entry, including what would have to change to revisit it.
-- [ ] Feature status changed or something is known-broken → `docs/status.json` updated.
+- [ ] Feature status changed or something is known-broken → `docs/status.json` updated, edited as text in place, and `git diff` shows only lines you meant to change (`docs/conventions.md` §9).
 - [ ] Roadmap item finished → checkbox ticked in `docs/roadmap.md`.
 - [ ] You changed or removed a behavior → grep the docs for its name and fix the stale references.
 

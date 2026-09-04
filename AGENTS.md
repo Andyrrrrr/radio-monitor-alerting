@@ -141,7 +141,7 @@ Before finishing any task:
 1. If you changed architecture, interfaces, or the data model → update `docs/architecture.md`.
 2. If you established a new pattern worth reusing → add it to `docs/conventions.md`.
 3. If you settled a question, or tried something and rejected it → add an entry to `docs/decisions.md`, including what would have to change to make it worth revisiting.
-4. If feature status changed, or you found something broken → update `docs/status.json`.
+4. If feature status changed, or you found something broken → update `docs/status.json`. **Edit it as text in place** — rewriting it with `json.dump` escapes every em dash and `§` unless you pass `ensure_ascii=False`, which silently churns lines you never touched (`docs/conventions.md` §9).
 5. If you completed a roadmap checkbox → tick it in `docs/roadmap.md`.
 6. If you changed hardware settings or ran a calibration → add a dated entry to `docs/bringup-log.md`.
 
