@@ -86,10 +86,18 @@ watchwords_path       = "config/watchwords.toml"  # falls back to the .example
 fuzzy_min_ratio       = 0.82
 # Phonetic (Metaphone) hits must also LOOK like the term (Jaro-Winkler ≥
 # this) — phonetic codes are 2-3 chars and collide wildly on their own.
-phonetic_min_similarity = 0.70
+# RAISED from 0.70 to 0.85 on 2026-09-07 after measuring against real Ch 16
+# traffic: at 0.70 this fired CRITICAL on "my", "made", "maybe" and "media"
+# (all score 0.79-0.80 against "mayday"). See docs/decisions.md D20 — the cost
+# is real and documented: "mated" -> "mayday" scores 0.760 and is now missed.
+phonetic_min_similarity = 0.85
 # Terms with tokens shorter than this skip the phonetic pass entirely
 # ("cpr" is one phonetic edit from "copy", the most common word on a radio).
 phonetic_min_token_len  = 4
+# Multi-word terms: every token must resemble its counterpart, not just the
+# joined string. "going to" scored 0.915 against "going down" on the strength
+# of "going" alone and fired a CRITICAL on real traffic (D20).
+phonetic_min_token_similarity = 0.80
 llm_min_words         = 8      # classify longer transcripts even with no match
 llm_min_confidence    = 0.6    # below this the LLM verdict only rates WATCH
 llm_timeout_s         = 5.0

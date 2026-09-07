@@ -42,12 +42,23 @@ def test_split_keyword_matches(matcher: WatchwordMatcher) -> None:
     assert any(h.term == "may day" and h.kind == "exact" for h in hits)
 
 
-def test_phonetic_match_mated(matcher: WatchwordMatcher) -> None:
-    # Classic ASR mangling: "mated" shares a Metaphone-adjacent shape and
-    # passes the Jaro-Winkler guard.
+def test_mated_is_deliberately_no_longer_matched(matcher: WatchwordMatcher) -> None:
+    # This test previously asserted the OPPOSITE, and the change is a
+    # deliberate, measured trade — not a regression. "mated" scores 0.760
+    # against "mayday", BELOW "my", "made" and "monday" at 0.800, so no
+    # similarity floor keeps it without also admitting the most common words
+    # on a radio. Measured against real Ch 16 traffic on 2026-09-07; see
+    # docs/decisions.md D20. AGENTS.md settles the direction: missed
+    # detections are acceptable, false positives are not.
     hits = matcher.match("mated mated this is fishing vessel gale runner")
-    phonetic = [h for h in hits if h.kind == "phonetic"]
-    assert any(h.term == "mayday" for h in phonetic)
+    assert [h for h in hits if h.term == "mayday"] == []
+
+
+def test_phonetic_pass_still_earns_its_place(matcher: WatchwordMatcher) -> None:
+    # The raised floor must not make the phonetic pass dead weight: a closer
+    # mangling still has to get through, or we should have deleted the pass.
+    hits = matcher.match("mayde mayde this is vessel gale runner")
+    assert any(h.term == "mayday" and h.kind == "phonetic" for h in hits)
 
 
 def test_phonetic_guard_blocks_unrelated_collisions(matcher: WatchwordMatcher) -> None:
@@ -113,3 +124,65 @@ def test_copy_that_does_not_phonetic_match_cpr(matcher: WatchwordMatcher) -> Non
 def test_explicit_missing_path_fails_loudly() -> None:
     with pytest.raises(FileNotFoundError):
         WatchwordMatcher.from_toml(DetectConfig(), Path("no/such/file.toml"))
+
+
+# -- phonetic false positives found on real Ch 16 traffic, 2026-09-07 -------
+#
+# The first real transmission this project ever processed produced TWO
+# CRITICAL watchword hits, neither of which appears in the transcript:
+# "mayday" matched the word "my", and "going down" matched "going to".
+# On a busy channel this fires constantly, which is the failure D12 warns
+# about — users trained to silence the app. See docs/decisions.md D20.
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    [
+        "my position is north",  # "my" -> mayday, score 0.80
+        "copy that my friend",
+        "made it in before dark",  # "made" -> mayday, 0.80
+        "maybe later on channel nine",  # "maybe" -> mayday, 0.79
+        "we are going to the marina",  # "going to" -> going down, 0.915
+        "going to need a tow",
+        "going to my slip",  # both false positives at once
+    ],
+)
+def test_common_radio_words_do_not_fire(matcher: WatchwordMatcher, phrase: str) -> None:
+    assert matcher.match(phrase) == []
+
+
+@pytest.mark.parametrize(
+    "transcript",
+    [
+        # Verbatim from the first real Ch 16 traffic captured on Parker's rig.
+        "Paging calling US Coast Guard, this is US Coast Guard, go ahead over.",
+        "Pushing the school, calling the Coast Guard. Yes, Coast Guard, go ahead, over.",
+        "Have pleasure, boat. I just have to check on the channel.",
+    ],
+)
+def test_real_captured_traffic_stays_quiet(
+    matcher: WatchwordMatcher, transcript: str
+) -> None:
+    assert matcher.match(transcript) == []
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    [
+        "mayday mayday mayday this is vessel serenity",
+        "we are taking on water",
+        "man overboard",
+        "we are going down",
+        "abandoning ship",
+    ],
+)
+def test_real_distress_still_fires(matcher: WatchwordMatcher, phrase: str) -> None:
+    # The guards must not be bought at the cost of the detections that matter.
+    assert matcher.match(phrase) != []
+
+
+def test_one_exact_token_cannot_carry_a_bad_one(matcher: WatchwordMatcher) -> None:
+    # The multi-word mechanism specifically: Jaro-Winkler over the joined
+    # string let "going" alone drag "going to" to 0.915 against "going down".
+    assert [h for h in matcher.match("we are going to the fuel dock")] == []
+    assert [h for h in matcher.match("we are going down") if h.term == "going down"]

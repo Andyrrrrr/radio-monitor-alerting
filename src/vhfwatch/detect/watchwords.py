@@ -175,15 +175,34 @@ class WatchwordMatcher:
                 continue
             window = " ".join(tokens[i : i + n])
             similarity = jellyfish.jaro_winkler_similarity(window, term.text)
-            if similarity >= self._cfg.phonetic_min_similarity and (
-                best_phonetic is None or similarity > best_phonetic.score
-            ):
+            if similarity < self._cfg.phonetic_min_similarity:
+                continue
+            if n > 1 and not self._every_token_similar(tokens[i : i + n], term.tokens):
+                continue
+            if best_phonetic is None or similarity > best_phonetic.score:
                 best_phonetic = WatchwordHit(
                     term.text, term.severity, "phonetic", window, similarity
                 )
         if best_phonetic is not None:
             return best_phonetic
         return self._match_fuzzy(term, tokens, n)
+
+    def _every_token_similar(
+        self, window_tokens: list[str], term_tokens: list[str]
+    ) -> bool:
+        """Each token must resemble its counterpart, not just the joined string.
+
+        Jaro-Winkler over the whole phrase lets one exact token carry a
+        garbage one: "going to" scored 0.915 against "going down" on the
+        strength of "going" alone, and fired a CRITICAL watchword on real
+        Ch 16 traffic (docs/decisions.md D20). Per token, "to" vs "down"
+        fails and the phrase is rejected.
+        """
+        return all(
+            jellyfish.jaro_winkler_similarity(w, t)
+            >= self._cfg.phonetic_min_token_similarity
+            for w, t in zip(window_tokens, term_tokens, strict=True)
+        )
 
     def _match_fuzzy(
         self, term: _Term, tokens: list[str], n: int

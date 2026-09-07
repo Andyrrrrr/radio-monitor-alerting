@@ -123,7 +123,10 @@ def test_short_clean_traffic_never_calls_llm() -> None:
 
 def test_fuzzy_only_match_without_llm_is_watch() -> None:
     # Phonetic/fuzzy hits are second-class: WATCH, not the group severity.
-    d = run_detect("mated mated this is gale runner", None)
+    # "mayde" rather than "mated": the phonetic floor was raised to 0.85 on
+    # 2026-09-07 and "mated" (0.760) no longer matches by design (D20). The
+    # rule under test here is severity resolution, not that particular word.
+    d = run_detect("mayde mayde this is gale runner", None)
     assert d is not None
     assert d.severity is Severity.WATCH
 

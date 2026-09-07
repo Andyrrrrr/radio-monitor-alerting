@@ -388,3 +388,67 @@ substituted or the radio swapped, isolating which box carries the noise;
 weak stations" — the assumption that speech RMS sits near −22 to −28 is
 inferred from a single peak reading, not measured, and is the weakest link
 above.
+
+---
+
+## D20 — Phonetic watchword guards tightened after real traffic; "mated" recall is the price
+
+**Decided 2026-09-07**, from the first real Ch 16 traffic this project ever
+processed. That single transmission produced **two CRITICAL watchword hits,
+neither of which appears in the transcript**: `mayday` matched the word
+**"my"** (0.80) and `going down` matched **"going to"** (0.915). Probing the
+matcher afterwards found `my`, `made`, `maybe` and `media` all firing
+`mayday`, and `going to` / `going in` firing `going down`. Those are among the
+most common words on any radio channel.
+
+This is the evidence D14 named as its own revisit condition, arriving from
+real audio rather than from `evaluate.py`.
+
+**Two distinct causes:**
+
+1. **Whole-phrase similarity let one exact token carry a garbage one.**
+   "going to" scored 0.915 against "going down" purely because "going"
+   matched exactly. Fixed by requiring **every token** to clear
+   `phonetic_min_token_similarity` (0.80) against its counterpart. Per token,
+   "to" vs "down" fails and the phrase is rejected.
+2. **The similarity floor was too low for 2-character Metaphone codes.**
+   `phonetic_min_similarity` raised **0.70 → 0.85**.
+
+**The cost is real, and it is the point of this entry: "mated" → "mayday" is
+now missed.** That is D14's canonical example and the original justification
+for the phonetic pass. Measured Jaro-Winkler against "mayday":
+
+| Candidate | Score | Wanted |
+|---|---|---|
+| `may day` | 0.967 | keep ✅ |
+| `mayde` | 0.893 | keep ✅ |
+| `medday` | 0.800 | keep ❌ lost |
+| `my` / `made` / `monday` | 0.800 | reject ✅ |
+| `maybe` | 0.790 | reject ✅ |
+| **`mated`** | **0.760** | **keep ❌ lost** |
+
+**No threshold separates them.** "mated" scores *below* three of the false
+positives, and "medday" ties exactly with "my", "made" and "monday" at 0.800.
+Raising the floor to 0.85 was chosen because it clears the entire 0.800
+collision cluster with margin.
+
+`AGENTS.md` settles the direction: *missed detections are acceptable, the user
+has other notification paths, so bias toward fewer false positives.* A matcher
+that fires CRITICAL on "my" would be silenced within a day, which is D12's
+stated failure mode.
+
+**The phonetic pass still earns its place** — `mayde` (0.893) and `may day`
+(0.967) get through, and there is a test pinning that. If a future change
+leaves nothing passing it, delete the pass rather than keeping dead weight.
+
+**Measured, not assumed:** all ten observed false positives are now silent,
+including three verbatim transcripts from real captured traffic, while every
+distress phrase still fires — those are exact matches and were never at risk.
+
+**Revisit when:** `scripts/evaluate.py` runs on a hand-labelled corpus large
+enough to measure what the raised floor actually costs in mangled-mayday
+recall. Today's evidence is a handful of probe phrases and one real
+transmission, which is enough to justify stopping the bleeding and not enough
+to call 0.85 optimal. If real maydays are being missed phonetically, the
+answer is probably a better phonetic algorithm (D14's rejected double
+metaphone), not a lower floor — the floor is holding back "my".
