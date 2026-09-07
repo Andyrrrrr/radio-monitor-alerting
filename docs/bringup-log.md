@@ -459,3 +459,150 @@ verified end to end and its thresholds were theory-derived guesses.
   deliberate yank test on either rig.
 
 ---
+
+## 2026-09-07 (afternoon) — Parker's rig: the receiver is deaf, and the audio chain is not the reason
+
+**Who:** Parker
+**Rig:** Parker/UCA202 ("Parker's Calibration Machine")
+**Sessions:** 10:26–10:57 (30 min), 11:45–12:05 (20 min), 12:17–12:19 (2 min, no traffic)
+
+Nothing was changed on the rig between these sessions.
+
+### The comparison that matters
+
+| Session | Heard by ear on a second handheld | Captured by the rig |
+|---|---|---|
+| 10:26, 30 min | 3 | **1** |
+| 11:45, 20 min | 5 (incl. a readable exchange with "Corvesta") | **0** |
+| **Total** | **8** | **1** |
+
+The one transmission that did get through arrived hot enough to **clip at 0 dBFS**.
+The rig appears to receive only signals far stronger than normal traffic. This is
+**not a regression** — it is what the rig has been doing all along, and the first
+session only looked like success because it happened to contain one very strong
+station.
+
+### What was ruled out, and how
+
+- **The audio chain.** The idle floor is −38.1 dBFS, matching every session with
+  the radio connected, versus −88.8 with the UCA202's inputs open. Cable,
+  interface, host, capture code and thresholds are all fine.
+- **Any change between sessions.** The two recordings are **spectrally
+  identical** — same mains-dominant idle signature, same rolloff in every band,
+  same DC, same peak character.
+- **Faint speech buried under the noise.** Whisper was run over the entire empty
+  20-minute session in 30 s chunks normalised to near full scale: **zero** speech
+  segments. That is strong evidence, because this project's own notes record that
+  Whisper hallucinates readily on noise — here it invented nothing. At 20 ms
+  resolution there is not even a brief squelch blip (max excursion 2.0 dB).
+
+### The physics that settles the interpretation
+
+**FM squelch is binary and there is no "quiet speech" state.** When squelch opens,
+the AF level is set by the volume control, *not* by signal strength — a weak
+station gives full-level scratchy audio, not quiet audio. So absence of audio
+means **the squelch never opened**, not that the signal was too weak to record.
+No threshold, model or gain change recovers these.
+
+### The lead that came out of it
+
+**"No accessible squelch control" has been read throughout these docs as "squelch
+is not adjustable." That is wrong for a commercial radio.** On the NX-5000 series
+squelch level is a **per-channel codeplug parameter** — there is no knob because
+it is set in programming. A tight programmed squelch on Ch 16 explains every
+observation, including why a stock handheld a few feet away hears five
+transmissions while this radio hears none.
+
+**Free test, one button:** most Kenwood commercial portables have a **Monitor /
+squelch-off** side key. Pressed during traffic — rushing noise *then*
+transmissions means squelch level is the fault and it is a programming change
+(§3.6 already treats squelch-open as a deliberate option); rushing noise and
+nothing else means RF is not reaching the radio, and antenna/position is next.
+
+### What broke / what's still unknown
+
+- ⚠️ **§5 step 1 (radio hears traffic by ear) is STILL unticked on both rigs**,
+  and this session is exactly the situation it exists to prevent. Two sessions of
+  threshold, noise and ASR analysis were performed downstream of a receiver whose
+  basic function had never been confirmed. All of that analysis is valid; it was
+  just measuring a chain fed by a nearly deaf receiver.
+- ⚠️ Radio programming on Parker's radio — channel, modulation, bandwidth, tone
+  squelch, **and now squelch level** — remains unconfirmed. Andy's was
+  owner-confirmed; this one never has been.
+- ⚠️ The second radio is a different receiver in a different position, so part of
+  the gap may be siting. The clean test is both radios side by side, then swapping
+  antennas between them.
+- The earlier conclusion "traffic volume is very low" was **wrong** and has been
+  corrected in `docs/status.json`. The site has ample Ch 16 traffic. Do not use
+  the 1-transmission-in-30-minutes figure for the Phase 4 watchdog threshold.
+
+---
+
+## 2026-09-07 (late afternoon) — RESOLVED: the radio was in the wrong place
+
+**Who:** Parker · **Rig:** Parker/UCA202 · **Session:** 12:59–13:17 (18.2 min)
+
+**The radio was moved from the desk into the window. Nothing else changed.**
+
+| | Desk | Window |
+|---|---|---|
+| Heard by ear | 8 | 6 |
+| Captured | **1** | **6** |
+
+**1-of-8 became 6-of-6.** Every transmission the operator logged was captured.
+
+### Why the earlier hypotheses were wrong
+
+Both radios are the **same model**, both are fire-department radios with
+**squelch fixed in the codeplug by the communications chief** (the operator is
+not permitted to change it), and they were **side by side** when the morning
+traffic came through. That eliminated siting, radio model, squelch programming,
+tone squelch and channel — every candidate except the one that turned out to
+matter.
+
+The leading hypothesis before this session was **computer RFI desensing the
+radio through the audio cable**. That is now unlikely: the audio noise floor
+barely moved between positions (−38.1 desk → −37.7 window) while reception
+transformed. If the cable were injecting noise into the receiver, moving the
+radio a few feet without changing the cable run would not produce this.
+
+**It was position.** At VHF, a few feet and a window frame is enough. Two
+identical radios inches apart behave differently when one is against glass and
+the other is in the middle of a desk.
+
+### What the window position does NOT fix
+
+- **Two of six transmissions arrived as 0.2 s blips** and were discarded by
+  `min_duration_ms = 600`. One of them was the operator's 13:09 entry —
+  *"towing a boat taking on water"* — the only genuinely distress-adjacent
+  traffic all day. Loosening `min_duration_ms` would not rescue it: there are
+  only 0.2 s of audio there, because the squelch opened and shut. **Marginal
+  signals are still lost, and the loss is silent.**
+- **Everything strong now clips.** Every captured segment logged
+  `peak_dbfs 0.2`. This is now cheap to fix and was not before: speech lands at
+  −8.7 to −10.5 dBFS RMS against a −38 floor, so there is **28 dB of SNR** and
+  the radio volume can drop ~10 dB and still leave 18 dB of margin. Suggested:
+  **volume 13–14 instead of 17**, then re-run `calibrate.py`.
+
+### Real traffic, transcribed
+
+> "Paging calling US Coast Guard, this is US Coast Guard, go ahead over."
+> "Pushing the school, calling the Coast Guard. Yes, Coast Guard, go ahead, over."
+
+"Coast Guard", "go ahead" and "over" are correct — real marine procedure
+vocabulary. The mangled openings are almost certainly a vessel name.
+
+**The NaN fix works on real audio.** All four transcripts carry real
+`avg_logprob` values, and "Vessel, calling the vessel," at −1.03 was correctly
+rejected by the post-ASR gate — the same gate that was silently inert this
+morning.
+
+### Actions
+
+- ⚠️ **Mark the window position.** It is worth more than any other single change
+  made today, and it is currently held by nothing but memory.
+- ⚠️ Reduce radio volume to ~13–14 and recalibrate to stop the clipping.
+- §5 step 1 (radio hears traffic by ear) is now effectively satisfied for this
+  rig by the 6-of-6 comparison against a human listening on an identical radio.
+
+---
