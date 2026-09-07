@@ -652,3 +652,71 @@ Both are answered by the next captured transmission. If speech now lands close
 to the threshold, the volume reduction went too far and 14–15 is the compromise.
 
 ---
+
+## 2026-09-07 (afternoon, 2h14m) — volume 13 verified; two new findings from real traffic
+
+**Who:** Parker · **Rig:** Parker/UCA202, window position, volume 13/31
+**Session:** 13:48–16:01 (2 h 14 min, 9 files, ~1.3 GB)
+
+### Volume 13 verified — the clipping is gone
+
+| | Volume 17 | Volume 13 |
+|---|---|---|
+| Clipped samples per event | 2 844 (0.99%), 6 698 (1.16%) | **49 (0.006%), 9, 41** |
+| Speech peak (100 ms RMS) | −4.6 to −2.6 dBFS | **−9.9 dBFS** |
+| Margin over `open_threshold_db` | — | **24 dB** |
+
+A ~150× reduction, low enough not to affect transcription. **No need to drop
+to 14 or 15.** Noise floor held at −40.7 to −41.1 across all nine files, and
+the operator's 13:56 laptop-audio change had no measurable effect.
+
+### Capture rate 2 of 8 — and volume 13 is NOT the cause
+
+Each missed timestamp was checked directly. All six show voice-band lifts of
+1.4–4.5 dB, and the definitively empty 11:45 session peaked at **4.4 dB on
+pure noise** — so they are indistinguishable from noise. **The audio never
+arrived; the squelch did not open.** If the volume reduction were responsible
+we would see audio present but below the gate. We see nothing. The operator's
+own notes agree — "clipped", "static", "couldn't understand".
+
+### Finding 1: the hysteresis window straddles squelch-open hiss
+
+Levels around the 13:59 broadcast: **−40.7 dBFS before, −19 during, −36.4 for
+fifteen seconds after.** That −36.4 is squelch-open hiss — the radio stays
+unmuted after the voice stops.
+
+`close_threshold_db` is **−38.1**, *below* that hiss, so once the gate opens it
+cannot close until the squelch itself closes. One spoken transmission became a
+**59-second segment**. `open_threshold_db` (−34.1) is correctly *above* the
+hiss, so hiss alone will not start a segment — but the hysteresis window sits
+across it.
+
+The calibrated floor (−41.1) is the **squelch-CLOSED** line. This rig has a
+third level that calibration never sees: squelch-open hiss at ≈−36.4. Any
+close threshold below it will hold segments open. Raising close to ≈−35.5 would
+close promptly but leaves only ~1.4 dB of hysteresis, which is its own risk.
+**Not changed yet — this needs more than one observation.**
+
+### Finding 2: `est_snr_db` does not measure intelligibility
+
+The 17-second broadcast the operator logged at 1:59 is **unintelligible to
+Whisper** — it returned `'!'` and nothing else, across raw, normalised and
+high-passed variants. Yet the audio *is* speech-shaped: broadband (top 12
+spectral bins hold 0.97% of the energy) with an envelope modulation peak at
+**3.11 Hz**, squarely in the syllabic range.
+
+The pipeline scored it **`est_snr_db` = 16.3 dB.**
+
+**In FM, once squelch opens the audio LEVEL is constant regardless of signal
+strength — only the recovered audio's QUALITY degrades.** `est_snr_db` measures
+level above the muted-line floor, so it is decoupled from intelligibility: a
+hiss-dominated, unreadable transmission scores 16 dB and passes
+`min_snr_db = 3.0` untouched. Every marginal transmission on this rig will do
+the same.
+
+Whisper emitted `'!'` rather than inventing a sentence this time. Given the
+project's documented concern about hallucination on noise, that is luck, not a
+guarantee. **This is a design gap, not a bug** — nothing is behaving contrary
+to its specification. Written up before proposing any change to the gating.
+
+---
