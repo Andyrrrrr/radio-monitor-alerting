@@ -151,6 +151,26 @@ input_gain_db = 0.0   # post-capture digital gain
 
 Clipping is the enemy. It destroys transcription accuracy far more than low level does.
 
+**Comparing two rigs: use peak-to-floor, not the floor.** When one rig's noise
+floor looks far worse than another's, the absolute numbers do not tell you
+where the noise comes from, and reasoning from them will send you to the wrong
+stage. Compare **dynamic range** — speech peak minus idle floor — and get both
+**volume knob positions** before forming any hypothesis. The logic: noise
+originating in the radio's own output amp scales with the volume setting, so a
+rig with a *lower* knob and *worse* peak-to-floor has its noise entering
+somewhere downstream of that knob (cable, interface, USB power, charger), and
+no interface trim or `input_gain_db` can improve it — both scale signal and
+noise together. This is the same argument as `docs/decisions.md` D18, and it
+decided the Parker/UCA202 rig too: 17/31 on the knob against Andy's ≈23, and
+29.1 dB of range against his 60.5 dB (`docs/bringup-log.md` 2026-09-07). Two
+wrong guesses were made on that rig before anyone asked for the knob number.
+
+**Isolating which box is noisy:** disconnect the radio and measure the
+interface alone with nothing on its inputs. If the floor barely moves, the
+interface or its USB power is the source; if it collapses, the noise arrives
+from the radio, cable or charger side. One cable pull, thirty seconds, and it
+halves the search space.
+
 **Ground loops:** low risk. The handheld runs on battery and is electrically isolated. If you later use a mains-powered base station, add a 1:1 audio isolation transformer.
 
 ### 3.6 Squelch: the tradeoff you're choosing

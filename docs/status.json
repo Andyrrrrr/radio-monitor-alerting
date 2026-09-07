@@ -1,6 +1,6 @@
 {
   "_readme": "Machine-readable project status. Read this at the start of a session to orient; update it at the end of any task that changes what's built or what's broken. Prose belongs in the docs — this file is the ledger. Status values: not_started | in_progress | complete | blocked.",
-  "last_updated": "2026-08-12",
+  "last_updated": "2026-09-07",
   "current_phase": "M2 rig verified and calibrated. Marine Ch 16 is NOT receivable at the POC site (antenna/siting, see hardware.md §4) - Phase 2's segmenter exit criterion will run against rebroadcast fire traffic instead, which validates segmentation logic but not weak-signal sensitivity. An antenna is now the project's highest-value action.",
   "phases": {
     "phase_0_skeleton": {
@@ -55,11 +55,11 @@
     },
     "parker_uca202": {
       "interface": "Behringer UCA202",
-      "audio_chain_verified": false,
-      "calibrated": false,
-      "noise_floor_dbfs": null,
-      "open_threshold_db": null,
-      "notes": "No hardware input trim — the front knob is headphone output only. The radio's volume knob may be the only analog control, with input_gain_db as a post-capture last resort."
+      "audio_chain_verified": true,
+      "calibrated": true,
+      "noise_floor_dbfs": -38.3,
+      "open_threshold_db": -31.3,
+      "notes": "Calibrated 2026-09-07 as 'Parker's Calibration Machine'. Radio on RCA left, use_channel = 0. Level set by the radio volume knob alone (the UCA202 has no input trim — the front knob is headphone output only) and TAPED, but the knob POSITION was never written down. Speech peaks -9.2 dBFS, no clipping. Floor -38.3 dBFS with p90 == median (0.0 dB spread over 30 s) — rock steady, and owner-confirmed as the operating baseline (radio in normal monitoring state, nothing transmitting), but 30 dB above the M2 rig's -68.1 with the squelch closed on BOTH rigs, cause not yet diagnosed. Thresholds deliberately deviate from the usual offsets: open = floor + 7 (not +10, because measured variability is zero), hysteresis 4 dB (not 6, because a 6 dB close threshold would land exactly on the floor and the gate would never close). See docs/decisions.md D19 — this is a provisional setting with an open defect behind it, not a settled property of the rig."
     }
   },
   "known_issues": [
@@ -68,7 +68,15 @@
       "severity": "informational"
     },
     {
-      "description": "Real ASR has never run: tests use a fake transcriber, so mlx-whisper/faster-whisper are exercised only at the import/signature level. First pipeline run downloads the model and is the true ASR smoke test.",
+      "description": "RESOLVED 2026-09-07: real ASR has now run end to end on real radio audio (Parker's rig, ch 7 test transmission, mlx-whisper small.en). The pipeline segmented 2 transmissions, transcribed both, archived Opus, and wrote to the DB with 0 pre-ASR rejects, 0 post-ASR rejects and 0 queue drops. faster-whisper is still exercised only at import/signature level.",
+      "severity": "informational"
+    },
+    {
+      "description": "BUG, found 2026-09-07 on the first real ASR run: mlx-whisper returns avg_logprob as NaN (not missing) on many segments — 4 of 5 whisper segments in the ch 7 test. Consequences chain badly. (1) asr/base.py merge_segments duration-weights the values, so a SINGLE NaN segment makes the merged avg_logprob NaN for the whole transmission. (2) At the gate, detect/hallucination.py line 56 tests `t.avg_logprob is not None and t.avg_logprob < threshold`, and NaN < -1.0 is False, so the check silently passes — the `is not None` guard never fires because the value is NaN, not None. (3) Written to SQLite, NaN is stored as NULL, which is why the transcript row reads None and masks the cause. Net effect: the logprob half of the post-ASR hallucination gate is INERT, and in the observed case it failed open on the LOWER-quality of the two segments — the one with a spurious '!' token and a mangled position readback, i.e. exactly what it exists to catch. no_speech_prob still functions, so the gate is degraded rather than absent. AGENTS.md calls detect/hallucination.py load-bearing. Fix direction: treat NaN as MISSING (math.isnan) in merge_segments so it stops poisoning the merged score, and make the gate LOG that the logprob check could not run rather than passing silently. Note failing closed would be wrong here: NaN appeared on 4 of 5 segments, so rejecting on unknown logprob would discard most real transcripts — the project accepts missed detections but not blind ones, and an unrunnable check is an uncertainty to surface (the web app already renders honest uncertainty) rather than a reason to drop evidence. Needs a regression test with a NaN segment; no current test covers it, which is how this reached real audio.",
+      "severity": "high"
+    },
+    {
+      "description": "First measured transcription quality on real radio audio (Parker's rig, 2026-09-07, small.en, chain 30 dB compromised): call signs, position minutes and persons-on-board counts were all corrupted. 'test station one' -> 'position one'; 'three six minutes north' dropped entirely; 'one two two degrees' -> 'one, two, two screens'; 'two one minutes west' -> 'one minute west'; 'Three persons on board' -> 'persons on board'. Degrees numbers survived ('four seven' -> '47'). This is a BASELINE on a known-bad audio chain, not a verdict on model choice — it should be re-measured after the 43 dB noise problem is diagnosed, and it is the first real input to the base.en/small.en/medium.en WER comparison. It also concretely validates the architecture's insistence that original audio stay reachable from every alert: a human hears the position correctly, the ASR does not.",
       "severity": "medium"
     },
     {
@@ -76,8 +84,8 @@
       "severity": "medium"
     },
     {
-      "description": "Parker's UCA202 rig has never been verified end to end, and its thresholds are still theory-derived guesses. Andy's M2 rig was verified and calibrated 2026-08-12. Calibration does not transfer between rigs (docs/decisions.md D11).",
-      "severity": "medium"
+      "description": "Parker's UCA202 rig is calibrated as of 2026-09-07 and its thresholds are measured, not guessed. Still unverified on that rig: §5 step 5 (no recording has been written to disk — the meter ran without --record), step 6 (segmentation against real traffic), and the radio's programming (channel, modulation, bandwidth, tone squelch are owner-confirmed on Andy's radio but NOT on Parker's). Calibration does not transfer between rigs (docs/decisions.md D11).",
+      "severity": "low"
     },
     {
       "description": "Pushover delivery is untested (needs VHFWATCH_PUSHOVER_TOKEN/USER and a phone). The Phase 3 exit criterion — alert deep link opens a playable incident record on a phone — has not been walked end to end.",
@@ -109,6 +117,10 @@
     },
     {
       "description": "Gain staging on the M2 rig inverts docs/hardware.md 3.5's default ordering, and this is measured, not preference: the 60 Hz interference is picked up on the cable downstream of the radio's volume knob, so the interface trim cannot improve SNR. Moving gain from radio to interface raised the idle floor from -68.4 to -38.0 dBFS and caused clipping. Radio high / trim low is correct here (docs/decisions.md D18). Anyone 'fixing' this back to 1/3 radio volume will silently break detection.",
+      "severity": "medium"
+    },
+    {
+      "description": "Parker's UCA202 rig measures a -38.3 dBFS noise floor against the M2 rig's -68.1 — a 30 dB gap between two rigs running the same radio model with the squelch closed on both, so it is a chain defect and not open-squelch hiss (an earlier reading of this data wrongly assumed the latter). The floor is extremely stable (p90 == median), and a 13 dB crest factor points at broadband amp or converter noise rather than a ground loop. Consequence: the gate sits near -31 instead of -58, so weak and distant stations are lost. Accepted provisionally by the rig's owner so the rig can be used now (AGENTS.md: missed detections are acceptable), but it is expected to be diagnosed, not filed away. The gain-staging hypothesis is FALSIFIED: Parker's volume knob is 17 of 0-31, BELOW Andy's 3/4 (~23), yet peak-to-floor is 29.1 dB against Andy's 60.5 dB — 31 dB less usable range with the radio turned DOWN further, so the radio's own amp is not the source and the noise enters downstream of the volume control (cable, UCA202, USB power, or charger). This makes the rig a second instance of D18, not its opposite: input_gain_db sits downstream of the noise and cannot improve SNR, and turning the radio UP would help but is capped near 3 dB by ADC headroom. That measurement was run 2026-09-07 and CLEARS the interface: UCA202 alone with nothing on its inputs reads -88.8 dBFS (p90 -88.7), its own converter floor and 20 dB below the entire M2 chain. Interface, USB power and host are eliminated; all ~50 dB enters from the radio side of the RCA cable. This does not exonerate the radio — noise injected into its output stage AFTER its volume control (a charger being the obvious candidate) would not scale with the knob and fits the data. Remaining split is charger vs radio output vs cable pickup; the charger A/B (battery-only, then charging) separates them in two 30-second runs. The rig is not inherently limited: a floor matching or beating Andy's is available in principle once the source is found. The charger A/B test (battery vs charging, idle vs during a transmission) is the cheapest next discriminator and has still not been run. See docs/decisions.md D19.",
       "severity": "medium"
     },
     {

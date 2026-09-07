@@ -214,3 +214,248 @@ First session. Before this, no rig had been verified at all.
 - `LiveAudioSource`'s USB disconnect/reconnect path still hasn't had a deliberate yank test.
 
 ---
+
+## 2026-09-07 — Parker's Calibration Machine: level set and floor calibrated on an unsquelchable rig
+
+**Who:** Parker
+**Rig:** Parker/UCA202 — referred to as **"Parker's Calibration Machine"**
+**Location:** ⚠️ TO CONFIRM
+**Weather / time of day:** ~09:50 local (America/Los_Angeles)
+
+First bring-up session for this rig. Level is set and the floor is measured.
+The headline is a **30 dB elevated noise floor versus the M2 rig** (−38.3
+vs −68.1) with the squelch closed on both, cause not yet diagnosed. The rig
+is put into service on the measured number provisionally
+(`docs/decisions.md` D19).
+
+### Hardware state
+
+| Item | Value |
+|---|---|
+| Radio | Kenwood NX-5200 (handheld) |
+| Channel programmed | ⚠️ TO CONFIRM |
+| Modulation | ⚠️ TO CONFIRM — should be analog FM |
+| Bandwidth | ⚠️ TO CONFIRM — should be 25 kHz wide |
+| TX inhibited? | ⚠️ NOT VERIFIED, and do not test it — testing means transmitting |
+| Squelch | **no accessible control — same as Andy's NX-5200, and closed by default.** Both rigs are therefore in the same squelch state, which is what makes the 30 dB floor difference a chain defect rather than a hiss measurement |
+| **Volume knob position** | **17 out of 0–31** (~55%), TAPED. Note this is *lower* than Andy's 3/4 (≈23 on the same scale, if it is the same scale — worth confirming), which is what rules out the radio's own amp as the noise source; see Observations |
+| Antenna | ⚠️ TO CONFIRM — presumed stock rubber duck |
+| Antenna location | ⚠️ TO CONFIRM |
+| Battery / power | ⚠️ **TO CONFIRM — and it matters more here than anywhere else in this table.** Whether the radio was on the charger during these measurements is unresolved, and charger noise is the leading candidate for the high floor. See "What broke / still unknown" |
+| Audio adapter | multi-pin → K1 2-pin |
+| **Rig** | Behringer UCA202 |
+| Cable to interface | 3.5 mm → dual RCA |
+| Audio interface | UCA202, **RCA left** |
+| **Capture channel** | `use_channel = 0` |
+| **Interface trim** | **none exists** — the UCA202's front knob is headphone output only. The radio's volume knob is the only analog gain stage on this rig |
+| **macOS input slider** | ⚠️ TO CONFIRM (§3.5 — check System Settings → Sound → Input; may be greyed out) |
+| `input_gain_db` in config | 0.0 — not needed, analog level is correct |
+| Sample rate | 48 kHz |
+| 48V phantom / Hi-Z | n/a on the UCA202 |
+| Host machine | MacBook (Apple Silicon) |
+| Device name matched | `USB Audio CODEC` (substring match; resolved to index 2 this session) |
+
+### Calibration
+
+| Measurement | Value |
+|---|---|
+| Noise floor, squelch **closed**, nobody transmitting (dBFS) | **−38.3** (median 100 ms RMS over 30 s). **Measurement conditions owner-confirmed:** radio in its normal monitoring state, nothing transmitting. This is the baseline the rig operates from, not a one-off reading. ⚠️ Still **30 dB above the M2 rig's −68.1 in the same squelch state** |
+| Noise floor, squelch open | n/a — no squelch control |
+| 90th percentile | **−38.3 — p90 equals the median.** The floor did not move measurably over 30 s |
+| Peak sample during "silence" | −25.4 dBFS (~13 dB crest over RMS, consistent with random noise rather than intermittent interference) |
+| Speech peak, typical (dBFS) | **−9.2** (loudest of a 12.8 s meter session on a transmission) |
+| Speech RMS range, per second | ⚠️ **NOT MEASURED** — inferred to be roughly −22 to −28 from the peak. This is the weakest number in the D19 reasoning and should be measured directly |
+| Clipping observed? | **No** |
+| Phase cancellation ruled out? | n/a — RCA is unbalanced by construction (§3.4 applies to the M2 only) |
+| `noise_floor_dbfs` set to | −38.3 |
+| `open_threshold_db` set to | **−31.3** (floor **+7**, not +10 — D19) |
+| `close_threshold_db` set to | **−35.3** (hysteresis **4 dB**, not 6 — D19) |
+
+### Verification steps (`docs/hardware.md` §5)
+
+| Step | Result | Notes |
+|---|---|---|
+| 1. Radio hears traffic by ear | ⬜ | Not formally done |
+| 2. Adapter passes analog audio | ✅ | Implied — a real transmission reached the meter at −9.2 dBFS |
+| 3. Mac sees interface (2 channels) | ✅ | `USB Audio CODEC`, 48 kHz, resolved to index 2 by name substring |
+| 4. Signal present, not cancelling | ✅ | Signal present on channel 0; cancellation is not a failure mode on unbalanced RCA |
+| 5. Mac records radio audio | ✅ | 47 s captured to `data/bringup/20260907-171006Z-ch07.wav` (**local only — never commit**). Peak −8.4 dBFS, 0 clipped samples |
+| 6. Segmentation fires correctly | 🟡 | Fired correctly on a *test* transmission — 2 segments, 0 discarded, 0 queue drops. The §5 step 6 exit criterion still needs a 30-minute run during real traffic |
+| 7. Transcription recognizable | 🟡 | **Whisper ran on real radio audio for the first time in this project.** Speech was recognizable; call signs, position minutes and the POB count were not. See "First real ASR run" below |
+| 8. End-to-end alert | ⬜ | |
+
+### Observations
+
+**The floor is 30 dB above the M2 rig's, with the squelch closed on both,
+and that is an unexplained defect — not a property of this rig.** −38.3 here
+vs −68.1 on Andy's M2, same radio model, same squelch state. The gate
+therefore sits near −31 instead of −58, and weak and distant stations
+(§3.6's hardest-to-keep class) will be lost.
+
+**The first reading of this session got it wrong and the wrong version was
+briefly written into the docs:** it assumed this radio passed continuous
+open-squelch hiss. It does not — the NX-5200 has no squelch control on
+*either* rig and sits closed by default (see the 2026-08-12 entry above).
+Both rigs are in the same state, so the 30 dB lives in the rest of the chain.
+
+**That hypothesis was gain staging, and the knob position falsifies it.**
+The first guess was that the UCA202's missing input trim forced the radio's
+volume much higher than Andy's, lifting the radio's own amp noise. Parker's
+knob is **17 of 0–31**, *below* Andy's 3/4 (≈23). Comparing dynamic range
+rather than absolute level:
+
+| | Peak | Floor | Peak-to-floor |
+|---|---|---|---|
+| Andy/M2 | −7.6 | −68.1 | **60.5 dB** |
+| Parker/UCA202 | −9.2 | −38.3 | **29.1 dB** |
+
+31 dB less usable range *with the radio turned down further.* Radio amp noise
+would scale with the volume setting, so a lower knob should give a relatively
+lower floor. It does not. **The noise enters downstream of the radio's volume
+control** — cable, UCA202, USB power, or charger.
+
+**Consequence, and it inverts the obvious fix:** `input_gain_db` sits
+downstream of the noise source and amplifies signal and noise equally, so it
+cannot improve SNR here. This rig is in the *same* situation as D18's M2, not
+the opposite one: the radio's volume is the only stage that moves signal
+without moving the interference. Turning the radio *up* would improve SNR —
+but ADC headroom caps that at roughly 3 dB (peaks are at −9.2, the ceiling is
+−6), so it is worth taking and nowhere near a fix.
+
+**The cable-pull test was run the same session and settles it: the UCA202 is
+clean.** With nothing plugged into its inputs, floor **−88.8 dBFS** (p90
+−88.7, peak −72.2) against **−38.3** with the radio connected.
+
+| Configuration | Floor | p90 |
+|---|---|---|
+| Radio + cable + UCA202 | −38.3 | −38.3 |
+| UCA202 alone, inputs open | **−88.8** | −88.7 |
+
+−88.8 is the converter's own noise floor, and **20 dB quieter than the entire
+M2 chain** (−68.1). The interface, its USB power, and the host are all
+eliminated. **All ~50 dB enters from the radio side of the RCA cable.**
+
+Two consequences:
+
+- **This rig is not inherently limited.** There is a very clean interface on
+  the end of it; a floor matching or beating Andy's is available in principle
+  once the source is found. Worth chasing rather than accepting.
+- **"Downstream of the volume control" includes *inside the radio*.** Noise
+  injected into the radio's output stage after its volume control — a charger
+  being the obvious candidate — would not scale with the knob and would look
+  exactly like what was measured. The knob-position deduction narrowed the
+  location; it did not exclude the radio itself.
+
+**Next cut, and it is the question that started this whole line of work:**
+reconnect exactly as before and measure on **battery with the charger fully
+disconnected**, then again while charging. That splits the remaining 50 dB
+between the charger and everything else (radio output, cable pickup, adapter)
+in two 30-second runs.
+
+Putting the rig into service on this number **was a deliberate call by its
+owner** — strong traffic still segments — but it is provisional, and D19
+records what would resolve it.
+
+**The floor is extraordinarily stable: p90 equals the median.** That is what
+justifies the tighter-than-standard +7 dB offset. A 30 dB elevated *stable*
+floor is a very different problem from a 30 dB elevated *drifting* one — the
+first costs sensitivity, the second would cost reliability too.
+
+**`level_meter.py` reported the floor as −41.5, which was 3.2 dB optimistic.**
+The meter only averages windows whose peak is below −30 dBFS
+(`scripts/level_meter.py:225`) so that speech does not pollute the estimate.
+On this rig the *noise itself* peaks at −25.4, so that filter was discarding
+the louder half of the noise and reporting only the quietest slice.
+**On a hissy rig, trust `calibrate.py`'s number, not the meter's summary line.**
+The meter's idle-floor figure is a convenience for knob-setting, not a
+calibration measurement.
+
+**`calibrate.py`'s loud-floor warning did not fire, and that is not an
+endorsement.** The warning triggers above −30 dBFS (`scripts/calibrate.py:86`);
+−38.3 passes silently while still being 30 dB worse than the other rig. The
+script has no way to know what "good" looks like for a rig it has never seen.
+
+### First real ASR run (same session, ch 7 test transmission)
+
+**Transmitted on channel 7** — a channel these radios are licensed for, matching
+the precedent set on 2026-08-12. **Ch 16 was not used and must not be: it is the
+international distress and calling frequency.** The monitoring radio stayed in
+receive.
+
+Recorded 47 s, of which one transmission at 25.1–36.5 s. Replayed through the
+full pipeline with `scripts/replay.py --fast`. Result: **2 transmissions
+segmented, 2 transcripts, 0 rejected pre-ASR, 0 rejected post-ASR, 0 discarded,
+0 queue drops.** Model `mlx-whisper:small.en`, warmup 16.7 s (which is exactly
+why `warmup()` at startup exists).
+
+| Spoken | Transcribed |
+|---|---|
+| "Radio check, radio check" | "If I can check, radio check" |
+| "test station one" | "position one" |
+| "four seven degrees" | "47 degrees" ✅ |
+| "three six minutes north" | *dropped entirely* |
+| "one two two degrees" | "one, two, two screens" |
+| "two one minutes west" | "one minute west" |
+| "Three persons on board" | "persons on board" |
+
+**Read this as a baseline on a known-bad chain, not as a verdict on the model.**
+This rig is running 30 dB above the M2's floor with the cause still
+undiagnosed. It is, however, the first real input to the base.en / small.en /
+medium.en WER comparison that Phase 1 has been waiting on.
+
+**It also makes the architecture's evidence rule concrete.** A human listening
+to that audio hears "three six minutes north" without difficulty; the ASR
+dropped it. Position and persons-on-board are precisely the fields a distress
+alert turns on, which is why original audio must stay reachable from every
+alert and the summary is never allowed to replace it.
+
+**Fragmentation:** one spoken transmission produced two segments (2.18 s and
+10.06 s). `hang_ms = 800` did not bridge the pause after "radio check". Not
+harmful here, but it is the mechanism the docs warn about, seen for real —
+worth watching during the step 6 run.
+
+**A bug was found, and it is the important outcome of this session.**
+`mlx-whisper` returns `avg_logprob` as **NaN** (not missing) on many segments —
+4 of 5 here. `merge_segments` duration-weights them, so one NaN poisons the
+whole transmission's score; at the gate `NaN < -1.0` is `False`, so
+`detect/hallucination.py`'s `is not None` guard never fires and the check
+passes silently; stored to SQLite the NaN becomes NULL, which hides the cause
+at the far end. **The logprob half of the post-ASR hallucination gate is
+inert**, and here it failed open on the *worse* of the two segments — the one
+with a spurious "!" token and the mangled position. `no_speech_prob` still
+works, so the gate is degraded rather than absent. Logged in
+`docs/status.json` as high severity.
+
+### What changed since last session
+
+First session for this rig. Before this, `parker_uca202` had never been
+verified end to end and its thresholds were theory-derived guesses.
+
+### What broke / what's still unknown
+
+- ⚠️ **The charger question that started this work is still unanswered.**
+  Whether the radio was charging during these measurements was not recorded.
+  Parker confirmed the radio was in its *normal monitoring state*, so whatever
+  the charger was doing is part of the accepted baseline by definition — but
+  that is not the same as knowing it costs nothing. If the rig normally
+  monitors while charging, charger noise may be a removable component of the
+  −38.3. **The A/B test — battery+idle, charging+idle, charging+transmission,
+  reading the `voice` and `hum` bands separately — is still the single most
+  valuable 10 minutes available on this rig.** If the floor drops materially
+  on battery, redo this calibration and revise D19.
+- ⚠️ **Andy's "3/4" is recorded as a fraction, not a step number.** The
+  comparison against Parker's 17/31 assumes both radios use the same 0–31
+  volume scale. Both are NX-5200s so this is very likely, but it has not been
+  confirmed, and the amp-noise deduction below rests on it.
+- ⚠️ **Speech RMS was never measured directly** — the −22 to −28 range that
+  D19's "strong traffic clears by 4 to 10 dB" claim rests on is inferred from
+  a single peak reading. Measure it on the next transmission.
+- ⚠️ Radio programming (channel, modulation, bandwidth, tone squelch) is
+  unconfirmed on this rig. Andy's was owner-confirmed; this one has not been.
+  **Do not diagnose software before confirming the radio can hear anything.**
+- Step 5 (a real recording on disk) has not been done — re-run the meter with
+  `--record` to close it.
+- `LiveAudioSource`'s USB disconnect/reconnect path still has not had a
+  deliberate yank test on either rig.
+
+---

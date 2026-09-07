@@ -297,3 +297,94 @@ ordering applies. Also revisit if transcription on strong local signals is
 unexpectedly mushy with no other explanation — that would be the first actual
 evidence of radio-stage distortion, and the fix is a *modest* reduction with
 recalibration, not a wholesale shift of gain to the interface.
+
+---
+
+## D19 — Parker's rig runs provisionally on a 30 dB elevated floor, accepting weak-signal loss until it is diagnosed
+
+**Decided 2026-09-07 by Parker, measured on "Parker's Calibration Machine"
+(Behringer UCA202 + Kenwood NX-5200).** Measured floor is **−38.3 dBFS**, with the
+measurement conditions owner-confirmed (radio in normal monitoring state,
+nothing transmitting), against the M2 rig's **−68.1** — a 30 dB gap between two rigs running the
+same radio model with the squelch closed on both. Thresholds are set from
+the measured number and the rig is put into service now; the gap is logged
+as a defect to chase, **not** as a property of the rig.
+
+**What this is NOT:** it is not open-squelch hiss. The first reading of this
+data assumed Parker's radio had no squelch and was therefore passing
+continuous hiss — but `docs/bringup-log.md` 2026-08-12 records that the
+NX-5200 has no accessible squelch control on *either* rig and sits **closed**
+by default. Both rigs are in the same squelch state. The 30 dB is a
+difference in the rest of the chain.
+
+**Gain staging was the first hypothesis, and the knob position falsifies it.**
+The guess was that the UCA202's missing input trim forced the radio's volume
+far above Andy's 3/4, lifting the radio's own amp noise. Parker's knob is
+**17 of 0–31** — *below* Andy's ≈23. Comparing dynamic range rather than
+absolute level: Andy gets 60.5 dB peak-to-floor (−7.6 / −68.1), Parker gets
+29.1 dB (−9.2 / −38.3). **31 dB less usable range with the radio turned down
+further.** Radio amp noise scales with the volume setting, so a lower knob
+should yield a relatively lower floor; it does not. The noise therefore
+enters **downstream of the radio's volume control** — cable, UCA202, USB
+power, or charger.
+
+**This inverts the obvious fix, and makes the rig a second instance of D18
+rather than its opposite.** `input_gain_db` sits downstream of the noise and
+scales signal and noise together, so it cannot improve SNR — the same
+argument D18 makes about the M2's trim. The radio's volume is again the only
+stage that moves signal without moving the interference, so turning it *up*
+helps; ADC headroom caps that at about 3 dB (peaks −9.2, ceiling −6). Worth
+taking, nowhere near sufficient.
+
+**That measurement was run, and it clears the interface.** UCA202 alone with
+nothing on its inputs: **−88.8 dBFS** (p90 −88.7), against −38.3 with the
+radio connected. −88.8 is the converter's own floor and 20 dB below the
+entire M2 chain. Interface, USB power and host are eliminated; **all ~50 dB
+enters from the radio side of the RCA cable.** Note this does not exonerate
+the radio: noise injected into its output stage *after* its volume control —
+a charger, typically — would not scale with the knob and matches the data.
+The remaining split is charger vs. radio-output vs. cable pickup, and the
+charger A/B (battery-only, then charging) separates the first from the rest
+in two 30-second runs.
+
+**A 13 dB crest factor (peak −25.4 vs RMS −38.3) says broadband noise, not
+hum,** which is consistent with amp or converter hiss and inconsistent with
+a ground loop. The charger A/B test is still unrun and remains the cheapest
+discriminator.
+
+**Why we ship on it anyway:** at −38.3 the gate sits near −31, and this rig's
+speech peaks measure −9.2 with speech RMS therefore near −22 to −28, so
+strong local traffic clears by 4 to 10 dB and segments correctly. What is
+lost is **weak and distant stations** — §3.6's hardest-to-keep class.
+`AGENTS.md` states that missed detections are acceptable and the user has
+other notification paths, so a usable rig with a documented blind spot beats
+a rig blocked on diagnosis. **This is a provisional setting with a known
+cause to find, and it should not calcify into "how Parker's rig is."**
+
+**Two deviations from the standard offsets, both measured, both deliberate:**
+
+- `open_threshold_db` is floor **+7** (−31.3), not the usual +10. The +10
+  heuristic exists to absorb floor *variability*; this floor measured
+  **p90 == median, 0.0 dB of spread over 30 s**, so 7 dB is ample margin and
+  the other 3 dB buys back sensitivity on a rig that has little to spare.
+- Hysteresis is **4 dB**, not 6. At 6 dB the close threshold would land on
+  −38.3 — exactly the floor — and the gate would never close, running every
+  segment to `max_duration_ms`.
+
+False opens are the cheap failure here: `min_duration_ms = 600` discards
+short noise blips, and `min_snr_db = 3.0` rejects noise-only segments before
+ASR, so a noise-triggered open costs a log line, not a hallucinated
+watchword.
+
+**Revisit when — and this one is expected to be revisited, not filed away:**
+(a) the charger A/B test runs (battery+idle vs charging+idle vs
+charging+transmission, reading the `voice` and `hum` bands separately);
+(b) the radio volume knob position is recorded and compared against Andy's
+3/4, and a lower-knob / `input_gain_db` split is measured against the
+current one — measure both splits and compare idle floors, per §3.5's
+instruction not to assume which stage dominates; (c) the UCA202 is
+substituted or the radio swapped, isolating which box carries the noise;
+(d) `evaluate.py` on real corpus shows the miss rate is worse than "some
+weak stations" — the assumption that speech RMS sits near −22 to −28 is
+inferred from a single peak reading, not measured, and is the weakest link
+above.
