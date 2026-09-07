@@ -606,3 +606,49 @@ morning.
   rig by the 6-of-6 comparison against a human listening on an identical radio.
 
 ---
+
+## 2026-09-07 (evening) — recalibrated at volume 13 in the window position
+
+**Who:** Parker · **Rig:** Parker/UCA202
+
+Radio volume reduced **17 → 13** (of 0–31) to stop the clipping that appeared
+once the window position made reception work. Recalibrated in place.
+
+| | Desk, vol 17 | Window, vol 13 |
+|---|---|---|
+| `noise_floor_dbfs` | −38.3 | **−41.1** |
+| p90 − median | 0.0 dB | **0.0 dB** (2 of 3 runs) |
+| `open_threshold_db` | −31.3 | **−34.1** (floor + 7) |
+| `close_threshold_db` | −35.3 | **−38.1** (floor + 3) |
+
+**The first run was measured three times, and the first one lied.** Run 1 gave
+median −41.1 with **p90 −37.3** — a 3.8 dB spread that sits *under*
+`calibrate.py`'s 6 dB instability warning, so nothing fired. Two repeat runs
+both gave p90 == median exactly. The first run caught a transient. **Do not
+paste a single calibrate.py run into config without repeating it** — the
+warning threshold is not tight enough to catch this, and a 3.8 dB spread would
+have put `close_threshold_db` within 0.2 dB of the p90, where the gate
+struggles to close.
+
+**A quiet data point on where the noise comes from.** Dropping the volume 4
+steps lowered the floor by only ~2.8 dB (−38.3 → −41.1). If the noise were
+entirely downstream of the volume control (D19's conclusion), the floor
+would not have moved at all. So *some* of it does scale with the radio's
+volume — the picture is mixed rather than purely downstream. Not enough to
+overturn D19, but worth knowing before the next attempt at the ~40 dB gap.
+
+### ⚠️ NOT YET VERIFIED — needs real traffic
+
+This calibration is measured on the idle line only. Two things are still
+unknown and cannot be checked without a transmission:
+
+1. **Whether the clipping is actually gone at volume 13.** Every capture at
+   volume 17 logged `peak_dbfs 0.2`.
+2. **Whether speech still clears −34.1.** At volume 17 speech landed at −8.7
+   to −10.5 dBFS RMS. Volume 13 should put it near −15 to −18, leaving ~23 dB
+   of SNR — but that is arithmetic, not measurement.
+
+Both are answered by the next captured transmission. If speech now lands close
+to the threshold, the volume reduction went too far and 14–15 is the compromise.
+
+---
