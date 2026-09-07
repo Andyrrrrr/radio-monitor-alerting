@@ -68,6 +68,32 @@ def gate_transcript(
     return None
 
 
+def unrunnable_checks(t: Transcript) -> list[str]:
+    """Names of post-ASR checks that could not run on this transcript.
+
+    A missing statistic is *unknown*, not bad, so it must not reject: the
+    project would rather keep an unknown than silently discard what might be
+    a real call (same reasoning as `gate_transmission`'s missing-SNR
+    pass-through). Failing closed would also be untenable in practice —
+    mlx-whisper returned NaN for `avg_logprob` on 4 of 5 segments on the
+    first real-audio run, so rejecting on it would throw away most real
+    traffic.
+
+    But an unrun check must never be *invisible*. A gate that quietly stops
+    gating is exactly the silent failure AGENTS.md calls the worst outcome,
+    and it is how this went unnoticed until real audio (docs/status.json,
+    2026-09-07). The caller logs these; this stays pure.
+    """
+    return [
+        name
+        for name, value in (
+            ("no_speech_prob", t.no_speech_prob),
+            ("avg_logprob", t.avg_logprob),
+        )
+        if value is None
+    ]
+
+
 def _max_consecutive_repeat(tokens: list[str]) -> int:
     """Longest run of one token. "mayday mayday mayday" (3) is real distress
     procedure; the loops Whisper produces on noise run far longer."""

@@ -7,6 +7,7 @@ segment dicts, so the merge logic lives here once and stays testable
 without either heavy dependency installed.
 """
 
+import math
 from typing import Protocol, TypedDict
 
 from vhfwatch.models import Transcript, Transmission, Word
@@ -60,21 +61,34 @@ def merge_segments(
                 )
             )
 
-    total = 0.0
-    logprob_acc = 0.0
-    nospeech_acc = 0.0
-    have_logprob = False
-    have_nospeech = False
+    # Each statistic carries its own weight total, so segments that didn't
+    # report it are excluded from the mean rather than diluting it toward
+    # zero. Diluting would make the score OPTIMISTIC (logprobs are negative),
+    # which is the one direction a gate input must never drift.
+    logprob_acc = logprob_dur = 0.0
+    nospeech_acc = nospeech_dur = 0.0
     for s in segments:
         dur = max(float(s.get("end", 0.0)) - float(s.get("start", 0.0)), 1e-3)
-        total += dur
-        if "avg_logprob" in s:
+        if _reported(s.get("avg_logprob")):
             logprob_acc += float(s["avg_logprob"]) * dur
-            have_logprob = True
-        if "no_speech_prob" in s:
+            logprob_dur += dur
+        if _reported(s.get("no_speech_prob")):
             nospeech_acc += float(s["no_speech_prob"]) * dur
-            have_nospeech = True
+            nospeech_dur += dur
 
-    avg_logprob = logprob_acc / total if have_logprob else None
-    no_speech_prob = nospeech_acc / total if have_nospeech else None
+    avg_logprob = logprob_acc / logprob_dur if logprob_dur else None
+    no_speech_prob = nospeech_acc / nospeech_dur if nospeech_dur else None
     return text, words, avg_logprob, no_speech_prob
+
+
+def _reported(value: object) -> bool:
+    """True only for a real number the engine actually reported.
+
+    mlx-whisper returns **NaN** for `avg_logprob` on many segments instead of
+    omitting the key (4 of 5 on the first real-audio run, 2026-09-07). NaN
+    propagates through the weighted mean, and every comparison against NaN is
+    False — so the post-ASR logprob gate stopped gating without saying so.
+    Treat non-finite as "not reported" and let the caller see None, which is
+    honest and which the gate already handles.
+    """
+    return isinstance(value, int | float) and math.isfinite(value)

@@ -106,3 +106,30 @@ path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding=
 
 - **Check `git diff` before you finish.** If it shows lines you didn't mean to touch, you rewrote the file when you meant to edit it.
 - The same applies to any UTF-8 file in `docs/` — the prose uses em dashes and `§` references throughout.
+
+## 10. Values that come back from a model or a driver
+
+Third-party inference and capture libraries return junk in-band. Two rules,
+both learned the hard way on 2026-09-07 when mlx-whisper returned
+`avg_logprob` as `NaN` and silently disabled half the hallucination gate:
+
+**Treat non-finite as "not reported", at the boundary.** Check
+`math.isfinite` where the value enters our code, not where it's used. `NaN`
+is worse than a missing key because it propagates through arithmetic and
+then compares `False` against every threshold — so a gate written as
+`if value is not None and value < limit` stops gating without raising
+anything. Convert to `None` at the edge and the rest of the codebase's
+existing `is None` handling works as written.
+
+**When a check can't run, say so.** A missing input usually shouldn't reject
+— unknown is not bad, and this project would rather keep an unknown than
+silently discard a possible real call. But an unrun check must be logged, or
+a safety gate can degrade to a no-op and nothing will ever tell you.
+`detect/hallucination.unrunnable_checks()` is the pattern: the gate stays a
+pure function, and the caller logs what couldn't be evaluated.
+
+**Weight each statistic by its own reporting duration.** When merging
+per-segment stats, a segment that didn't report a value must be excluded
+from that value's mean, not counted as zero — diluting `avg_logprob` toward
+zero makes it look *better*, and optimism is the one direction a gate input
+must never drift.

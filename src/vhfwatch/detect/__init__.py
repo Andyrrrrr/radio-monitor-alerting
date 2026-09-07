@@ -2,7 +2,11 @@
 
 from vhfwatch.detect.classify import Classifier
 from vhfwatch.detect.detector import Detector
-from vhfwatch.detect.hallucination import gate_transcript, gate_transmission
+from vhfwatch.detect.hallucination import (
+    gate_transcript,
+    gate_transmission,
+    unrunnable_checks,
+)
 from vhfwatch.detect.watchwords import WatchwordMatcher
 
 __all__ = [
@@ -11,4 +15,5 @@ __all__ = [
     "WatchwordMatcher",
     "gate_transcript",
     "gate_transmission",
+    "unrunnable_checks",
 ]

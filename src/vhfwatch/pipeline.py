@@ -49,6 +49,7 @@ from vhfwatch.detect import (
     WatchwordMatcher,
     gate_transcript,
     gate_transmission,
+    unrunnable_checks,
 )
 from vhfwatch.incidents.correlator import DetectionContext, IncidentCorrelator
 from vhfwatch.log import configure_logging
@@ -194,6 +195,16 @@ async def run(
                 transcript = await transcriber.transcribe(tx)
                 db.insert_transcript(transcript)
                 stats.transcripts += 1
+                missing = unrunnable_checks(transcript)
+                if missing:
+                    # Not a rejection — but the operator must be able to see
+                    # that part of the hallucination gate did not run.
+                    logger.warning(
+                        "transcript.checks_unrunnable",
+                        transmission_id=tx.id,
+                        missing=",".join(missing),
+                        engine=transcript.engine,
+                    )
                 reject = gate_transcript(transcript, cfg.hallucination, cfg.asr)
                 if reject is not None:
                     # Stored (it's evidence for corpus review) but never

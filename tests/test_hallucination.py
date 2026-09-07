@@ -11,7 +11,11 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 
 from vhfwatch.config import AsrConfig, HallucinationConfig
-from vhfwatch.detect.hallucination import gate_transcript, gate_transmission
+from vhfwatch.detect.hallucination import (
+    gate_transcript,
+    gate_transmission,
+    unrunnable_checks,
+)
 from vhfwatch.models import Transcript, Transmission, new_id
 
 HALL = HallucinationConfig()
@@ -122,3 +126,39 @@ def test_repetition_loop_rejected() -> None:
     reason = gate_transcript(t, HALL, ASR)
     assert reason is not None
     assert "repeated" in reason
+
+
+# -- unrunnable checks (regression, found on real audio 2026-09-07) ---------
+
+
+def test_missing_logprob_does_not_reject() -> None:
+    # Unknown is not bad: mlx-whisper reports no avg_logprob on most
+    # segments, so rejecting on it would discard most real traffic.
+    assert (
+        gate_transcript(make_transcript("radio check", avg_logprob=None), HALL, ASR)
+        is None
+    )
+
+
+def test_missing_stats_are_reported_as_unrunnable() -> None:
+    # ...but the unrun check must be visible. This is the half of the fix
+    # that keeps the gate from silently degrading.
+    assert unrunnable_checks(make_transcript("x", avg_logprob=None)) == ["avg_logprob"]
+    assert unrunnable_checks(make_transcript("x", no_speech_prob=None)) == [
+        "no_speech_prob"
+    ]
+    assert unrunnable_checks(
+        make_transcript("x", avg_logprob=None, no_speech_prob=None)
+    ) == ["no_speech_prob", "avg_logprob"]
+
+
+def test_fully_reported_transcript_has_nothing_unrunnable() -> None:
+    assert unrunnable_checks(make_transcript("radio check")) == []
+
+
+def test_real_logprob_still_rejects() -> None:
+    # The gate must still work when the engine does report a number —
+    # the fix must not turn the check off for everyone.
+    reason = gate_transcript(make_transcript("mumble", avg_logprob=-2.5), HALL, ASR)
+    assert reason is not None
+    assert "avg_logprob" in reason
