@@ -219,7 +219,7 @@ First session. Before this, no rig had been verified at all.
 
 **Who:** Parker
 **Rig:** Parker/UCA202 — referred to as **"Parker's Calibration Machine"**
-**Location:** ⚠️ TO CONFIRM
+**Location:** Parker's fire station (all Parker/UCA202 sessions are here — the "desk" and "window" positions below are both inside it)
 **Weather / time of day:** ~09:50 local (America/Los_Angeles)
 
 First bring-up session for this rig. Level is set and the floor is measured.
