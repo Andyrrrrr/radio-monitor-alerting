@@ -580,3 +580,61 @@ rig runs long enough to show idle windows louder than the 30 s calibration
 sample saw — the tail is an extreme-value estimate, and 30 seconds of it is
 thin. If segments start running to `max_duration_ms`, that is this failure
 returning and the answer is a longer calibration run, not a lower threshold.
+
+---
+
+## D23 — No ground-loop isolator for now; the hum is only present when the line is muted
+
+**Decided 2026-09-10**, after D21 found a mains-powered laptop injecting
+8.9 dB of supply hum and D22 fixed the gate. The obvious next step was the
+1:1 audio isolation transformer `docs/hardware.md` §3.5 recommends for
+mains-powered setups (~$15). We measured what it would actually buy, and the
+answer is: nothing that matters today.
+
+**The hum exists only while the radio's output is muted.** Measured through a
+real transmission on 2026-09-10:
+
+| | Idle (squelch closed) | During voice |
+|---|---|---|
+| 60 Hz | −36.4 | **−64** |
+| 120 Hz | −32.3 | **−60** |
+| Voice band | −35.5 | −8 to −17 |
+
+~28 dB of collapse the instant the squelch opens — D17's mechanism exactly:
+high-impedance pickup on a floating line, shorted out when the output stage
+drives it. **So the hum never appears in the audio the transcriber sees.**
+Transcription quality on this rig is set by the RF path, not by the laptop's
+power supply.
+
+**A measurement error worth recording**, because it nearly produced the wrong
+conclusion: a sample taken shortly after the voice ended was initially read as
+"squelch open, no voice" and showed the hum apparently *not* collapsing. Its
+spectrum was identical to the muted line — same harmonics, spectral flatness
+0.010 vs 0.008 — because the squelch had already closed. **On this rig,
+"shortly after a transmission" is not a squelch-open sample.** Check the
+spectrum before assuming which state a quiet stretch is in.
+
+**Why the isolator is not needed now:**
+
+- The gate problem is solved by band gating (D22), not by removing the hum.
+- Thresholds are calibrated to the worst case (laptop on mains), so the rig
+  works in either power state with no re-tuning.
+- The hum is absent from every transmission, so it costs no transcription
+  accuracy.
+
+**What is given up, stated so nobody assumes it is free:**
+
+- **Headroom.** Band-limited idle floor is −39.8 against an open threshold of
+  −28.9 — about **11 dB**. An isolator would restore ~13 dB of that. A
+  different laptop, outlet or added charger could eat the margin and jam the
+  gate again.
+- `est_snr_db` is referenced to a hummy floor and so reads pessimistic. That
+  errs safe, and the metric is already known not to measure intelligibility.
+- The noise-floor drift warning fires whenever the power state changes.
+
+**Revisit when:** (a) the rig runs **unattended** — an 11 dB margin that a
+swapped power brick can eat is not acceptable for a system nobody is watching,
+and that makes the isolator a Phase 4 item; (b) `calibrate.py` shows the
+band-limited floor creeping toward −28.9 after any change to the power setup —
+re-running it is the 30-second early warning; (c) the rig moves to a mains
+supply with a worse ground path than this one.
