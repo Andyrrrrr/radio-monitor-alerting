@@ -781,3 +781,64 @@ no warning. A floor can be perfectly stable and still be 9 dB too high.
 - Antenna comparison needs several more sessions before any claim.
 
 ---
+
+## 2026-09-10 (later) — band-limited gate enabled so the laptop can stay plugged in
+
+**Who:** Parker · **Rig:** Parker/UCA202, fire station, window, volume 13, NA-773
+
+The operator needs the laptop on mains for extended runs, which puts 8.9 dB of
+supply hum on the idle line (D21). Rather than depend on remembering to
+unplug, the gate now measures the **voice band** instead of full-band RMS.
+
+### Settings after this change
+
+| | Before | After |
+|---|---|---|
+| `gate_band_hz` | (didn't exist) | **[300.0, 3400.0]** |
+| `noise_floor_dbfs` | −41.1 full-band | **−39.8** band-limited, 20 ms, laptop ON MAINS |
+| `open_threshold_db` | −34.1 | **−28.9** |
+| `close_threshold_db` | −38.1 | **−32.9** |
+
+**These numbers are NOT comparable to the old ones** — different measurement
+domain. Calibrated to the **worst case (laptop plugged in)** deliberately, so
+the rig works in either power state. On battery the band floor is ~−53, so the
+drift warning will fire when the laptop is unplugged; that is the warning
+working, not a fault.
+
+### The first attempt failed, and that is the useful part
+
+Thresholds derived from the band-limited *median* still jammed the gate — one
+120-second segment closed by `max_duration`, exactly the failure the change was
+meant to fix.
+
+**`calibrate.py` was measuring 100 ms windows while the segmenter gates on
+20 ms windows**, and had been since it was written. Short windows average less
+noise, so the tail is much higher:
+
+| Window | median | p90 | max |
+|---|---|---|---|
+| 100 ms | −40.0 | −40.0 | −39.9 |
+| **20 ms** | −40.4 | **−37.0** | **−34.9** |
+
+The close threshold sat inside that 5 dB tail and was crossed ~1.5 times per
+second. The gate closes only after `hang_ms` of **continuous** quiet, so every
+crossing reset the timer.
+
+`calibrate.py` now measures at `frame_ms` and derives thresholds from the
+**tail** (`close = loudest idle window + 2 dB`, `open = close + 4 dB`).
+
+⚠️ **This affects Andy's rig too and has not been checked.** His
+`close_threshold_db` (−64.1) came from a 100 ms median and may sit inside a
+20 ms tail. Re-run `calibrate.py` on the M2 before trusting its segment
+durations.
+
+### Verified end to end
+
+Replaying the recording that jammed now yields **29.5 s and 2.2 s segments,
+both closed by `hang_time`**, matching the two real transmissions — instead of
+one 120 s segment closed by `max_duration`.
+
+Speech band-limited at 20 ms measures p1 −25.6 / p50 −16.2 dBFS, so 99.9% of
+speech windows clear the −28.9 open threshold.
+
+---

@@ -500,3 +500,83 @@ radio's own charger cost 7.4 dB on the same rig on 2026-09-07.
 isolator stops being optional. Also note `calibrate.py` gives no hint about
 this: it reported a stable floor with p90 == median and no warning. A floor
 can be perfectly stable and still be 9 dB too high.
+
+---
+
+## D22 — The gate measures a frequency band and a noise tail, not full-band RMS and a median
+
+**Decided 2026-09-10**, after a mains-powered laptop put Parker's idle floor
+above `open_threshold_db` (D21) and the obvious fixes turned out to be wrong
+in two separate ways.
+
+### Part 1: gate on the voice band, archive everything
+
+`segmenter.gate_band_hz` (default `[]` = full-band, so no existing rig
+changes; Parker's rig sets `[300.0, 3400.0]`).
+
+Sub-300 Hz hum cannot mask speech — D17 established that it collapses ~28 dB
+the instant the squelch opens — but it *can* sit above the open threshold and
+hold the gate open forever. A marine VHF channel carries voice in roughly
+300–3000 Hz, so energy outside that band is never signal. Measured on real
+audio:
+
+| | Full-band gate | Voice-band gate |
+|---|---|---|
+| Idle, laptop on mains | −32.1 | **−39.4** |
+| Idle, clean | −38.9 | **−49.2** |
+| Speech | −16.2 | −16.7 (**0.5 dB cost**) |
+
+**A high-pass filter was considered and rejected.** It measured slightly worse
+(−39.8 vs −39.4 on the hum), needed a hand-written biquad because `scipy` is
+not a declared dependency, and carried filter state across frames. Band
+energy is stateless, vectorised, and says what it means.
+
+**The archived audio is never filtered.** It is evidence (AGENTS.md), and a
+human listening back must hear what the radio produced. Only the gate and the
+noise-floor estimate see the band. `Transmission.rms_dbfs` is therefore
+reported in the gate's domain so `est_snr_db` doesn't mix domains and
+silently inflate — but `peak_dbfs` stays on the raw audio, because clipping
+happens at the ADC and a band-limited reading would hide it.
+
+**This does not contradict D17.** D17 asked whether a filter helps
+*intelligibility* and correctly answered no. This is a gate-path measurement
+change for a reason D17 never considered.
+
+### Part 2: `calibrate.py` was measuring the wrong window, and always had been
+
+**The first attempt at Part 1 failed**, and the failure is the more valuable
+half of this entry. Thresholds derived from the band-limited *median* still
+jammed the gate: every segment ran to `max_duration_ms`.
+
+Cause: **`calibrate.py` measured 100 ms windows while the segmenter gates on
+`frame_ms` (20 ms) windows.** Short windows average less noise, so their tail
+is far higher — the same idle line reads:
+
+| Window | median | p90 | max |
+|---|---|---|---|
+| 100 ms | −40.0 | −40.0 | −39.9 |
+| **20 ms** | −40.4 | **−37.0** | **−34.9** |
+
+A close threshold of −36.8, derived from the median, sat *inside* that 5 dB
+tail and was crossed ~1.5 times a second. Since the gate closes only after
+`hang_ms` of **continuous** quiet, every crossing reset the timer and the gate
+never closed.
+
+**Two changes:**
+
+1. `calibrate.py` now measures at `segmenter.frame_ms`, so the number it
+   prints means the same thing the gate will measure.
+2. Thresholds derive from the **tail**, not the median:
+   `close = max_idle_window + 2 dB`, `open = close + 4 dB`. What matters for
+   closing is the loudest window the idle line produces, not its average.
+
+**This bug predates today and affects full-band rigs too.** It was invisible
+while margins were wide. ⚠️ **Andy's M2 close threshold (−64.1) was derived
+as median + 4 dB from a 100 ms measurement and has never been checked against
+a 20 ms tail** — it may be sitting inside one.
+
+**Revisit when:** `frame_ms` changes (the thresholds are tied to it now), or a
+rig runs long enough to show idle windows louder than the 30 s calibration
+sample saw — the tail is an extreme-value estimate, and 30 seconds of it is
+thin. If segments start running to `max_duration_ms`, that is this failure
+returning and the answer is a longer calibration run, not a lower threshold.

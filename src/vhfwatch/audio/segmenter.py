@@ -41,6 +41,43 @@ def _dbfs(rms: float) -> float:
     return 20.0 * math.log10(max(rms, _MIN_RMS))
 
 
+class BandGate:
+    """Per-window RMS restricted to a frequency band, for the GATE only.
+
+    Why this exists: sub-300 Hz mains hum can sit ABOVE `open_threshold_db`
+    while being completely unable to mask speech — it collapses ~28 dB the
+    instant the squelch opens, because the radio's output stage then drives
+    the line at low impedance (docs/decisions.md D17). Measured on Parker's
+    rig, a mains-powered laptop put the idle floor at -31.8 dBFS against a
+    -34.1 threshold, which would hold the gate open forever (D21). A marine
+    VHF channel carries voice in roughly 300-3000 Hz, so energy outside that
+    band is never signal and excluding it costs nothing real: measured 0.5 dB
+    on speech against 7.4 dB of hum removed (D22).
+
+    The ARCHIVED audio is never touched. It is evidence (AGENTS.md), and a
+    human listening back must hear what the radio actually produced.
+    """
+
+    def __init__(
+        self, low_hz: float, high_hz: float, sample_rate: int, window_len: int
+    ) -> None:
+        self._window = np.hanning(window_len).astype(np.float32)
+        freqs = np.fft.rfftfreq(window_len, 1.0 / sample_rate)
+        self._mask = (freqs >= low_hz) & (freqs < high_hz)
+        self._scale = window_len / 2.0
+        # Hann windowing removes power; dividing it back out keeps a
+        # full-band reading on the same scale as a plain RMS, so the two
+        # gate modes stay numerically comparable.
+        self._correction = float(
+            np.sqrt(np.sum(self._window.astype(np.float64) ** 2) / window_len)
+        )
+
+    def rms(self, pcm: npt.NDArray[np.float32]) -> float:
+        spectrum = np.fft.rfft(pcm * self._window) / self._scale / self._correction
+        power = float(np.sum(np.abs(spectrum[self._mask]) ** 2) / 2.0)
+        return math.sqrt(max(power, 0.0))
+
+
 @dataclass
 class _Window:
     """One analysis window (frame_ms of samples) with its level."""
@@ -71,6 +108,16 @@ class Segmenter:
         self._channel = channel
         self._source_name = source_name
         self._frame_len = sample_rate * cfg.frame_ms // 1000
+
+        # Gate measurement: full-band RMS by default, or band-limited when
+        # configured. Affects the GATE and the noise-floor estimate only.
+        self._band_gate: BandGate | None = (
+            BandGate(
+                cfg.gate_band_hz[0], cfg.gate_band_hz[1], sample_rate, self._frame_len
+            )
+            if cfg.gate_band_hz
+            else None
+        )
 
         # Ring holds the pre-roll PLUS the open-run windows, so that on open
         # we can take everything in one go: [preroll silence][open run].
@@ -127,7 +174,12 @@ class Segmenter:
             assert self._base_time is not None
             t = self._base_time + timedelta(seconds=self._consumed / self._rate)
             self._consumed += self._frame_len
-            tx = self._process(_Window(pcm, t, _dbfs(float(np.sqrt(np.mean(pcm**2))))))
+            gate_rms = (
+                self._band_gate.rms(pcm)
+                if self._band_gate is not None
+                else float(np.sqrt(np.mean(pcm**2)))
+            )
+            tx = self._process(_Window(pcm, t, _dbfs(gate_rms)))
             if tx is not None:
                 out.append(tx)
         return out
@@ -248,11 +300,18 @@ class Segmenter:
 
         # Level stats over the voiced span only — including the pre-roll and
         # hang-time quiet would understate every reading.
-        voiced = pcm[
-            self._n_preroll * self._frame_len : (self._last_voiced + 1)
-            * self._frame_len
-        ]
-        rms_dbfs = _dbfs(float(np.sqrt(np.mean(voiced**2))))
+        #
+        # rms_dbfs is the power mean of the per-window GATE levels, not a
+        # fresh reading off the raw pcm. With full-band gating the two are
+        # identical; with band gating they are not, and est_snr_db below
+        # subtracts a noise floor built from those same gate levels — mixing
+        # the domains would silently inflate the SNR of every transmission on
+        # a hummy rig, which is exactly where it must not be optimistic.
+        voiced_windows = windows[self._n_preroll : self._last_voiced + 1]
+        mean_power = float(np.mean([10.0 ** (w.rms_db / 10.0) for w in voiced_windows]))
+        rms_dbfs = 10.0 * math.log10(max(mean_power, _MIN_RMS**2))
+        # Peak stays on the RAW audio: clipping happens at the ADC, and a
+        # band-limited reading could hide it entirely.
         peak_dbfs = _dbfs(float(np.max(np.abs(pcm))))
         est_snr_db = (
             rms_dbfs - self._noise_floor_db

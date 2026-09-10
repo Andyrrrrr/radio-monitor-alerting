@@ -71,6 +71,28 @@ class SegmenterConfig(_Section):
     max_duration_ms: int = 120000  # force close a stuck transmitter
     clip_warn_dbfs: float = -0.5
     noise_ema_alpha: float = 0.05  # noise-floor smoothing; higher = adapts faster
+    # Measure the GATE on this frequency band instead of full-band RMS.
+    # Empty = full-band (the original behaviour, and the default so no
+    # existing rig changes). [300.0, 3400.0] gates on the voice band, which
+    # makes the gate immune to sub-300 Hz mains hum that cannot mask speech
+    # but CAN sit above open_threshold_db and jam the gate permanently open
+    # (docs/decisions.md D21, D22). Thresholds must be recalibrated when this
+    # changes — the band-limited floor is much lower than the full-band one.
+    # The ARCHIVED audio is never filtered; this affects the gate only.
+    gate_band_hz: list[float] = []
+
+    @model_validator(mode="after")
+    def _gate_band_is_sane(self) -> Self:
+        if self.gate_band_hz and len(self.gate_band_hz) != 2:
+            raise ValueError(
+                "gate_band_hz must be empty (full-band) or exactly "
+                f"[low_hz, high_hz]; got {self.gate_band_hz}"
+            )
+        if self.gate_band_hz and self.gate_band_hz[0] >= self.gate_band_hz[1]:
+            raise ValueError(
+                f"gate_band_hz low must be below high; got {self.gate_band_hz}"
+            )
+        return self
 
     @model_validator(mode="after")
     def _hysteresis_holds(self) -> Self:

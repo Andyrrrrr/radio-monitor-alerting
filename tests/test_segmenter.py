@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from tests.synth import BASE, RATE, frames, silence, tone
-from vhfwatch.audio.segmenter import Segmenter
+from vhfwatch.audio.segmenter import BandGate, Segmenter
 from vhfwatch.config import SegmenterConfig
 from vhfwatch.models import Transmission
 
@@ -167,3 +167,72 @@ def test_wrong_sample_rate_is_rejected() -> None:
     bad.sample_rate = 48000
     with pytest.raises(ValueError, match="48000"):
         seg.push(bad)
+
+
+# -- band-limited gate (D22) -------------------------------------------------
+#
+# Sub-300 Hz mains hum cannot mask speech — it collapses ~28 dB the instant the
+# squelch opens — but it CAN sit above open_threshold_db and hold the gate open
+# forever. A mains-powered laptop did exactly that on Parker's rig
+# (docs/decisions.md D21). These pin the fix, and that the archive is untouched.
+
+VOICE_HZ = [300.0, 3400.0]
+
+
+def test_band_gate_sees_speech_band_and_ignores_hum() -> None:
+    n = RATE * FRAME_MS // 1000
+    gate = BandGate(300.0, 3400.0, RATE, n)
+    hum = tone(FRAME_MS, -20.0, freq=120.0)[:n]
+    voice = tone(FRAME_MS, -20.0, freq=1000.0)[:n]
+    hum_db = 20 * np.log10(max(gate.rms(hum), 1e-10))
+    voice_db = 20 * np.log10(max(gate.rms(voice), 1e-10))
+    # Equal amplitude in, so equal full-band RMS; the gate must see only one.
+    assert voice_db > hum_db + 30
+
+
+def test_band_gate_agrees_with_plain_rms_for_an_in_band_signal() -> None:
+    # The Hann correction exists so the two gate modes stay numerically
+    # comparable — without it every threshold would shift on switching mode
+    # for reasons unrelated to the band.
+    n = RATE * FRAME_MS // 1000
+    gate = BandGate(0.0, RATE / 2, RATE, n)
+    sig = tone(FRAME_MS, -20.0, freq=1000.0)[:n]
+    assert gate.rms(sig) == pytest.approx(float(np.sqrt(np.mean(sig**2))), rel=0.05)
+
+
+def test_hum_jams_a_full_band_gate_but_not_a_banded_one() -> None:
+    # The 2026-09-10 failure reproduced: hum alone, no speech, loud enough to
+    # clear the open threshold.
+    pcm = np.concatenate([tone(3000, -33.0, freq=120.0), silence(500)])
+
+    wide = SegmenterConfig(open_threshold_db=-40.0, close_threshold_db=-46.0)
+    out_wide, _ = run_segmenter(pcm, wide)
+    assert len(out_wide) == 1, "full-band gate should emit a segment of pure hum"
+
+    banded = SegmenterConfig(
+        open_threshold_db=-40.0, close_threshold_db=-46.0, gate_band_hz=VOICE_HZ
+    )
+    out_band, _ = run_segmenter(pcm, banded)
+    assert out_band == [], "band gate must not open on sub-300 Hz hum"
+
+
+def test_archived_audio_is_never_band_filtered() -> None:
+    # AGENTS.md: original audio is evidence. The gate may look at a band; the
+    # Transmission must carry what the radio actually produced.
+    speech = tone(1500, -20.0, freq=1000.0) + tone(1500, -26.0, freq=120.0)
+    pcm = np.concatenate([silence(400), speech, silence(1200)])
+    cfg = SegmenterConfig(
+        open_threshold_db=-40.0, close_threshold_db=-46.0, gate_band_hz=VOICE_HZ
+    )
+    out, _ = run_segmenter(pcm, cfg)
+    assert out, "banded gate should still open on real speech"
+    spec = np.abs(np.fft.rfft(out[0].pcm))
+    freqs = np.fft.rfftfreq(len(out[0].pcm), 1 / RATE)
+    hum_bin = float(spec[(freqs > 110) & (freqs < 130)].max())
+    voice_bin = float(spec[(freqs > 950) & (freqs < 1050)].max())
+    assert hum_bin > voice_bin * 0.05, "hum was filtered out of the archived audio"
+
+
+def test_full_band_gate_is_unchanged_by_default() -> None:
+    # Default config must behave exactly as before this feature existed.
+    assert SegmenterConfig().gate_band_hz == []

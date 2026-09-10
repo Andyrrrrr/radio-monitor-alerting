@@ -57,6 +57,19 @@ noise_ema_alpha    = 0.05      # smoothing for the running noise-floor estimate
                                # closed-squelch frames; raise to adapt faster at
                                # noisier sites, lower for steadier estimates
 
+# Gate on a frequency band instead of full-band RMS. Empty = full-band, the
+# original behaviour and the default, so no existing rig changes.
+# [300.0, 3400.0] = the voice band a marine VHF channel actually carries.
+# WHY: sub-300 Hz mains hum cannot mask speech (it collapses ~28 dB the moment
+# the squelch opens) but it CAN sit above open_threshold_db and hold the gate
+# open forever — a mains-powered laptop did exactly that on Parker's rig, and
+# calibrate.py gave no warning (docs/decisions.md D21, D22).
+# The ARCHIVED audio is never filtered; this affects the gate only.
+# THRESHOLDS MUST BE RECALIBRATED when you change this — the band-limited
+# floor is ~10 dB below the full-band one, and calibrate.py reads the band
+# automatically once it is set here.
+gate_band_hz       = []
+
 [asr]
 engine        = "mlx"          # "mlx" (Apple Silicon) | "faster_whisper" (portable)
 model         = "small.en"     # first run downloads the model (~500 MB, once)
