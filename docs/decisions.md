@@ -452,3 +452,51 @@ transmission, which is enough to justify stopping the bleeding and not enough
 to call 0.85 optimal. If real maydays are being missed phonetically, the
 answer is probably a better phonetic algorithm (D14's rejected double
 metaphone), not a lower floor — the floor is holding back "my".
+
+---
+
+## D21 — D17's hum test is necessary but not sufficient: check the gate threshold too
+
+**Found 2026-09-10 on Parker's rig at the fire station.** The laptop was
+plugged into mains rather than running on battery, and injected **8.9 dB** of
+supply hum into the audio chain: idle floor **−31.8 dBFS** instead of −40.7.
+The spectrum was unambiguous — 84% of the energy in mains harmonics with
+**120 Hz dominant at 74.7 dB**, which is full-wave-rectified supply ripple,
+not the 60 Hz-dominant ambient field pickup of D17. Unplugging the laptop
+restored −40.7 (p90 == median) and dropped every harmonic: 180 Hz by 45 dB,
+300 and 360 Hz by 24–29 dB, 120 Hz by 13 dB.
+
+**D17's test was applied and passed — and the setup was still broken.** The
+hum collapsed ~28 dB the instant a transmission opened the squelch (60 Hz
+−36.4 → −64, 120 Hz −32.3 → −60, voice band −35.5 → −8). Exactly D17's
+mechanism: high-impedance pickup on a muted output, shorted out when the
+radio's output stage drives the line. It is anti-correlated with signal and
+**can never mask speech**, so D17 correctly says no filter is warranted.
+
+**But it broke the segmenter anyway, by a different route.** At −31.8 dBFS the
+idle line sat **above** `open_threshold_db` (−34.1). The gate would never
+close: one continuous segment, hum fed to Whisper, and the noise-floor drift
+warning firing on a rig that is otherwise fine. On Andy's M2 the hum sits ~24
+dB below the threshold, so this failure mode never appeared there and D17 had
+no reason to consider it.
+
+**So the hum test has two questions, not one:**
+
+1. **Does it persist through a transmission?** (D17) If yes, it competes with
+   speech — isolation transformer, or a filter.
+2. **Does the idle floor stay below `open_threshold_db`?** (this entry) If no,
+   the gate never closes, regardless of how harmless the hum is to
+   intelligibility.
+
+**Fix used:** run the laptop on battery. **That is a test-day answer, not a
+deployment one** — a monitoring system cannot run on laptop battery
+indefinitely. For permanent mains operation the answer is the one
+`docs/hardware.md` §3.5 already names for mains-powered setups: a 1:1 audio
+isolation transformer / ground-loop isolator inline on the RCA cable, roughly
+$15. This is now the second independent measurement pointing at it — the
+radio's own charger cost 7.4 dB on the same rig on 2026-09-07.
+
+**Revisit when:** the rig runs on mains permanently, at which point the
+isolator stops being optional. Also note `calibrate.py` gives no hint about
+this: it reported a stable floor with p90 == median and no warning. A floor
+can be perfectly stable and still be 9 dB too high.

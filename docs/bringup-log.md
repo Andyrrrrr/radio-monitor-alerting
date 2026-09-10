@@ -720,3 +720,64 @@ guarantee. **This is a design gap, not a bug** — nothing is behaving contrary
 to its specification. Written up before proposing any change to the gating.
 
 ---
+
+## 2026-09-10 — NA-773 antenna installed; laptop mains supply found injecting 9 dB of hum
+
+**Who:** Parker · **Rig:** Parker/UCA202, fire station, window position, volume 13/31
+**Session:** 08:04:39 – 09:32:29 (1 h 28 min, 6 files)
+
+**Only the antenna changed** since 2026-09-07 — same site, same window
+position, same volume, same channel. Stock rubber duck → **Nagoya NA-773**.
+
+### The antenna: encouraging, NOT proven
+
+| | 7 Sep, stock duck | 10 Sep, NA-773 |
+|---|---|---|
+| Captured / heard by ear | 2 of 8 | **2 of 2–3** |
+| Fragments (<0.6 s) | 2 of 3 | **0 of 2** |
+| Event durations | 16.7 s, 0.6 s, 0.2 s | **28.4 s, 1.2 s** |
+| Events per hour | 1.3 | 1.4 |
+
+The operator logged three (08:04, 08:53, 09:02); recording started 08:04:39, so
+the first is probably outside the window. Both captures were **full-length, not
+fragments** — the metric predicted hardest to explain away.
+
+**Two events is far too few to conclude anything.** A quiet channel produces
+the same numbers as a good antenna. Traffic was light. Several more sessions
+are needed before crediting the NA-773. The hum below does *not* confound this
+— it affects the audio floor, not whether the radio hears anything.
+
+### The laptop's power supply was injecting 8.9 dB of hum
+
+Idle floor read **−31.8 dBFS**, against −40.7 to −41.1 on 7 Sep. Spectrum:
+**84% of energy in mains harmonics, 120 Hz dominant at 74.7 dB** — full-wave
+rectified supply ripple, not the 60 Hz-dominant ambient pickup of D17.
+
+**Unplugging the laptop from mains restored −40.7** (p90 == median), dropping
+180 Hz by 45 dB, 300 and 360 Hz by 24–29 dB, 120 Hz by 13 dB. Only 60 Hz
+remains, down 6 dB — ordinary ambient pickup.
+
+**−40.7 is within 0.4 dB of the −41.1 in config, so the existing calibration
+still stands. No config change was needed.**
+
+**Why this mattered even though the hum is harmless to speech:** it collapsed
+~28 dB the moment a transmission opened the squelch (voice band −35.5 → −8),
+so it can never mask speech and D17 correctly says no filter. But at −31.8 the
+idle line sat **above** `open_threshold_db` (−34.1) — the gate would never
+close. See `docs/decisions.md` **D21**: the hum test needs a second question,
+"does the idle floor stay below the open threshold?", not just D17's "does it
+survive a transmission?".
+
+⚠️ **`calibrate.py` gave no hint.** It reported a stable floor, p90 == median,
+no warning. A floor can be perfectly stable and still be 9 dB too high.
+
+### Actions
+
+- ⚠️ **Running the laptop on battery is a test-day fix, not a deployment one.**
+  For permanent mains operation, a 1:1 audio isolation transformer /
+  ground-loop isolator on the RCA line (~$15, `hardware.md` §3.5). This is the
+  **second** independent measurement pointing at it — the radio's own charger
+  cost 7.4 dB on this rig on 2026-09-07.
+- Antenna comparison needs several more sessions before any claim.
+
+---
