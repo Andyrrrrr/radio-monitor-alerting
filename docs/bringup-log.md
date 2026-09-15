@@ -842,3 +842,98 @@ Speech band-limited at 20 ms measures p1 −25.6 / p50 −16.2 dBFS, so 99.9% of
 speech windows clear the −28.9 open threshold.
 
 ---
+
+## 2026-09-15 — 6 h 37 m live watch: 2 of 2 against the ear log, and volume 13 has no headroom left
+
+**Who:** Parker · **Rig:** Parker/UCA202, fire station, window, volume 13/31, NA-773
+**Session:** 10:04:32 – 16:41:55 local (6 h 37 min, live pipeline, not `record_corpus.py`)
+
+**Nothing was changed.** Same site, window position, volume, antenna and config
+as 2026-09-10. The point of the session was a real-time ear-log comparison: the
+operator logged what he heard, the pipeline reported what it captured, and the
+two were compared as they happened rather than afterward.
+
+### Result: 2 transmissions, 2 in the ear log, 2 captured
+
+| Local | Dur | Voiced | rms | peak | `est_snr_db` | Transcript (small.en) |
+|---|---|---|---|---|---|---|
+| 10:16:00 | 2.2 s | 1.08 s | −17.1 | **−0.16** | 22.0 | "See you guys." |
+| 15:00:49 | 4.8 s | 3.72 s | −13.3 | **−0.08** | 27.9 | "Last night, last night," |
+
+Both closed by `hang_time`, neither fragmented, 0 pre-ASR rejects, 0 post-ASR
+rejects, 0 queue drops, 0 detections (no watchword hits — correct).
+
+**Capture rate 2 of 2, but that is two events, not a result.** The operator
+logged nothing the pipeline missed, which is the metric that matters, and it is
+the second session in a row with no fragments. It is still far too little to
+credit the NA-773. 6 h 37 m for two transmissions is **0.3/hour** against
+1.4/hour on 9/10 — and per the operator, **Ch 16 here is normally very quiet;
+9/10 was the unusual session, not this one.** Do not read future silence as a
+fault, and do not use 9/10's rate as the expected rate.
+
+**The second transcript is probably incomplete**: 3.72 s of voiced audio
+yielded four words, repeated. Consistent with the 9/07 finding that marginal
+FM audio arrives at full level but low intelligibility — see `est_snr_db` 27.9
+on a transmission Whisper could barely read. That finding now has a second
+observation behind it.
+
+### Volume 13 clips on both transmissions — headroom is effectively zero
+
+Both events tripped `clip_warn_dbfs` (−0.5): peaks **−0.16 and −0.08 dBFS**.
+Decoding the archived Opus, 0.03% and 0.05% of samples sit within 1 dB of full
+scale — brief peaks touching the ceiling, not sustained distortion, and not
+enough to hurt transcription. (Not directly comparable to 9/07's "clipped
+samples" count, which measured at full scale, not within 1 dB.)
+
+9/07 concluded "the clipping is gone" at volume 13 from nine files. That still
+holds in the sense that matters — no gross distortion — but **2 of 2 loud
+transmissions now touch the ceiling, so there is no margin for a louder or
+closer station.** Clipping is destructive and upstream; `input_gain_db` cannot
+undo it.
+
+**Not changed today, deliberately:** dropping to volume 12 would have made the
+session non-comparable with 9/10 mid-run, and it requires re-running
+`calibrate.py` (the knob sets the floor as well as the peaks). Speech has room
+to spare — 15:00 averaged −13.3 dBFS against a −28.9 open threshold — so one
+step down is unlikely to cost detections. **Decide before the next session, not
+during one.**
+
+### Proving silence was real: a half-hourly idle reading
+
+Six and a half hours with two events is mostly silence, and a quiet channel and
+a dead audio chain look identical from the log. Every ~30 min, a separate 5 s
+capture was band-limited to 300–3400 Hz and measured at 20 ms windows — the
+same domain as the gate:
+
+**−39.6 to −41.1 dBFS median across 9 readings, all within 1.3 dB of the
+calibrated −39.8.** A disconnected radio or wrong `use_channel` reads far
+lower. This is worth keeping as the standing check during a quiet watch;
+`/health` and Phase 4 heartbeats do not exist yet.
+
+**Power state changed mid-session and did not matter.** Started on battery
+(10:04), plugged in by 11:05, AC for the rest. No `audio.noise_floor_drift`
+warning fired in either state, and the idle readings above bracket both — the
+band-limited gate (D22) is doing exactly what it was enabled for.
+
+macOS sleep was blocked with `caffeinate -i -w <pid>` for the run. **Untested:
+whether the pipeline recovers its capture stream after a sleep/wake cycle.**
+Assume it does not until someone checks.
+
+### Not exercised today
+
+No `VHFWATCH_ANTHROPIC_API_KEY` and no Pushover credentials, so Tier 2
+classification and push alerting were off for the whole session. Tier 1
+watchwords ran and correctly fired nothing.
+
+### Next session
+
+- **Operator plans to move the rig closer to the water** for better reception
+  and more complete transmissions. That changes site, so treat its numbers as
+  a new rig state: re-run `calibrate.py` there and do not carry today's floor
+  across (D11).
+- Decide volume 12 vs 13 **before** starting, and recalibrate if it changes.
+- Keep running the ear-log comparison. The useful number is transmissions the
+  operator hears that the pipeline misses; totals mostly measure how busy the
+  channel was.
+
+---
