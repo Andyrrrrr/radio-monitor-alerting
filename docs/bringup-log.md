@@ -937,3 +937,132 @@ watchwords ran and correctly fired nothing.
   channel was.
 
 ---
+
+## 2026-09-23 — Pushover proven end to end; a real Coast Guard case that fired no alert; and capture died silently for 50 minutes
+
+**Who:** Parker · **Rig:** Parker/UCA202, fire station, window, volume 13/31, NA-773
+**Session:** 08:06:45 – 17:31:21 local trustworthy (9 h 25 min), stopped 18:25
+**Unchanged** from 2026-09-15: same site, window position, volume, antenna, config.
+
+### 18 transmissions, 13 with words, 5 without
+
+All captured whole, none fragmented, no queue drops. Full list in the database;
+the shape of it:
+
+| Local | Dur | `est_snr_db` | Transcript |
+|---|---|---|---|
+| 08:42:46 | 5.2 s | 26.8 | "Pission Con copy, this is United States Coast Guard…" |
+| 08:43:01 | 11.0 s | 29.1 | "…channel 16 is for hailing and distress only…" |
+| 12:51:33 | 1.9 s | 19.3 | *(empty — rejected)* |
+| 13:43:51 | 2.5 s | 23.6 | "!" |
+| 15:57:18 | 11.0 s | 25.7 | "!" |
+| 17:21:21 – 17:31:13 | 13 events | 18.7–25.2 | the assistance case below |
+
+### The finding that matters: a real Coast Guard assistance case, zero detections
+
+Between 17:21 and 17:31 the rig captured a complete case end to end — vessel
+hailing with no answer, Coast Guard response, GPS position requested, anchor
+advised, vessel description and cell number taken, a landline attempt, TowBoatUS
+("HOPO USA", "Hobo") brought in and confirmed visual, then "if your situation
+changes or worsens… Coast Guard out."
+
+**`detection` rows for the whole day: 0.**
+
+Nothing in the watchword list was ever spoken. The list carries "adrift",
+"aground", "taking on water", "require assistance"; what was actually said was
+*"can I get a GPS position"*, *"do you have an anchor on board"*, *"are you able
+to deploy it"*. **The emergency is legible only from the Coast Guard's
+questions**, and the vessel's own replies are among the transmissions that did
+not transcribe.
+
+This is exactly the gap Tier 2 exists to close, and Tier 2 was **off all day** —
+no `VHFWATCH_ANTHROPIC_API_KEY` set. So the session produced the best test case
+this project has ever had: **replay 17:21–17:31 with the classifier enabled and
+see whether it alerts.** That is a measured answer to "does Tier 2 earn its
+place", against real traffic rather than a synthetic fixture.
+
+### Small craft do not transcribe; the Coast Guard does
+
+Every clean transcript today is a Coast Guard transmission. Every "!" is the
+other side of a conversation. One clip (17:24:25) contains **both**: it opens
+"! !" — the vessel — then switches to clearly-transcribed Coast Guard audio.
+Same recording, same radio, same moment.
+
+Signal strength does not separate them cleanly: 17:22:07 transcribed a full
+sentence at 19.8 dB while 15:57:18 produced "!" at 25.7 dB with
+`no_speech_prob` 0.05 — eleven seconds of audio the model was *confident* was
+speech and could not read a word of. This is the 2026-09-07 finding
+(`est_snr_db` does not measure intelligibility) reproduced with a much stronger
+case, and it argues for the water-side relocation over any model change: a
+bigger model cannot recover what the RF path destroyed.
+
+**Vessel names are the consistent casualty** — one vessel appeared as "Sir
+Muggis", "Sir budget", "For budget", "For budgets", "For much assistance", and
+TowBoatUS as "Hobo" / "HOPO USA". In a real mayday the name is what identifies
+the boat, and it is on the audio but not in the text.
+
+### CAPTURE DIED SILENTLY AT ~17:31 AND NOTHING NOTICED FOR 50 MINUTES
+
+The UCA202 vanished from the system — absent from `audio_devices.py` and from
+the USB bus — and:
+
+- the pipeline process **stayed alive and logged nothing**;
+- `/health` would have looked normal;
+- the noise-floor drift warning did **not** fire until 18:24, ~53 min later;
+- it was caught only because the half-hourly idle check tries to **open the
+  device directly** and got `ValueError: No input device matching 'USB Audio CODEC'`.
+
+At 18:24 a stalled buffer flushed through and produced a bogus 1.8 s
+"transmission" **stamped 17:36:33** — `started_at` is derived from sample
+counting, so a stalled stream drifts behind wall clock — transcribed as
+"No, I love, I..." on a line measuring **−57.5 dBFS** against −39.8 calibrated.
+That row is annotated in the database as not-real-audio; exclude it from corpus,
+labelling and `evaluate.py`.
+
+**Cause not established.** Cable, hub or dock power are the candidates; the rig
+was shut down before it could be diagnosed. Check it before trusting the next
+session.
+
+⚠️ **This is the failure mode AGENTS.md calls the worst outcome, observed for
+real.** A quiet channel and a dead capture chain are indistinguishable from the
+log. Concrete Phase 4 requirements this produces:
+
+1. A **capture heartbeat**: assert that audio frames are still arriving, not
+   merely that the process lives. Sample-count time falling behind wall clock is
+   a direct, cheap signal.
+2. The drift warning fires **once** and only when the estimate moves. It is not
+   a substitute for (1).
+3. Probing the device (opening it, not reading a cached list) is the check that
+   actually worked today — the half-hourly idle reading should become part of
+   the product, not a session habit.
+
+### Pushover works, end to end, for the first time
+
+`scripts/notify_transmissions.py` (new, a bring-up tool — NOT the alert path)
+sent one push per transmission with transcript and a LAN audio link, 4–13 s
+after each transmission ended. Setup notes:
+
+- Credentials live in `~/.vhfwatch-pushover.env` (outside the repo, mode 600),
+  sourced into the process environment. They were entered twice in the wrong
+  slots and once with a corrupted character; `/1/users/validate.json` is the
+  fastest way to tell "wrong key" from "wrong slot".
+- The web app was temporarily bound to `0.0.0.0` with `base_url` set to the
+  station LAN IP so links opened on the phone; **both reverted at shutdown.**
+- Audio links reuse ONE share token minted against the most recent incident,
+  because share-token scope is per-incident and there is no per-transmission
+  scope. Test-harness compromise, documented in the script.
+- **The tool pushed a transcript the pipeline had REJECTED** (`! ! ! ! ! ! !`,
+  caught as a repeated token) without saying it was rejected. Fine for a
+  bring-up aid, would be misleading in anything operational.
+
+### Next session
+
+- **Diagnose the USB dropout first.** Everything else is worthless if capture
+  dies unobserved.
+- Replay 17:21–17:31 with the classifier enabled. Best available answer to
+  whether Tier 2 would catch a real case.
+- Volume 12 still pending from 2026-09-15; two clips today at −0.4 dBFS.
+- Water-side relocation is now the best-supported change: it is a new site, so
+  re-run `calibrate.py` there (D11).
+
+---
