@@ -6,6 +6,9 @@ POC hardware, the gotchas in it, and a verification procedure that tells you whi
 
 ## 1. Two rigs, one codebase
 
+*(A third is in progress — a Motorola MCS 2000 at Parker's fire station, tapped
+pre-volume at its accessory connector. Specified in §3.9, not yet built.)*
+
 Development happens on two different audio front-ends. **This is supported deliberately, but it has consequences.**
 
 | | Andy's rig | Parker's rig |
@@ -203,6 +206,135 @@ A wrong `use_channel` produces near-silence, which is indistinguishable by sympt
 ### 3.8 Rejected: Bluetooth
 
 Parker's radio has Bluetooth. It is not a viable audio path. Recorded here so it doesn't get revisited — see `docs/decisions.md` for the full reasoning. Summary: macOS cannot act as a Bluetooth audio sink, and headset audio profiles apply AGC, noise suppression, and VAD that would actively break the segmentation design.
+
+---
+
+### 3.9 Parker's station rig — Motorola MCS 2000 (IN PROGRESS, not yet built)
+
+**Status 2026-10-01: researched and specified, nothing wired yet.** Contacts on
+order. Nothing below has been verified against a meter — treat every pin number
+as a claim to check, not a fact, until the bring-up steps at the end pass.
+
+A **spare** Motorola MCS 2000 mobile at Parker's fire station, City of
+Bellingham asset 2168, remote control head, external Motorola speaker, powered
+by an **Astron RS-35A** linear supply on 115 VAC. The communications chief has
+authorised modifying this radio: it is a spare, not in service. **That
+authorisation is specific to this radio** — the other station radios are not
+ours to touch.
+
+**Why bother when the UCA202 chain already works:** the tap point is
+`FIL AUD OUT`, which is **before the volume control**. Two standing problems
+disappear with it.
+
+| Problem on the handheld rig | On this rig |
+|---|---|
+| Level depends on the volume knob being at exactly 13, held by tape and a note | Volume knob has no effect on the tap |
+| Clipping: 4 transmissions have hit `clip_warn_dbfs` across three sessions | Fixed level, set by the radio, cannot be knocked |
+| Battery-powered handheld | Mains, permanently sited |
+
+It is still squelch-gated audio, so the segmenter behaves exactly as it does
+today. Silence between transmissions stays silence.
+
+#### The accessory connector
+
+**HLN6412A**, 25-pin, in a recessed opening on the **underside** of the radio
+body. Not the rear — and not the 18-pin control-head connector on the side,
+which is a different connector whose cable is labelled `TO CONTROL HEAD`.
+Unplugging that one takes the radio out of service.
+
+| Pin | Signal | | Pin | Signal |
+|---|---|---|---|---|
+| 1 | SPKR+ | | 14 | SW B+ |
+| 2 | INT SPKR+ | | 15 | IGNITION |
+| 3 | SPKR− | | 16 | I/O 2 |
+| 4 | DIGITAL GND | | 17 | LH RESET |
+| 5 | BUSY | | 18 | BUS− |
+| 6 | BUS+ | | 19 | SCI RX DATA |
+| 7 | I/O 8 | | 20 | I/O 4 |
+| 8 | I/O 5 | | 21 | I/O 3 |
+| 9 | EMERGENCY | | 22 | RSSI OUT |
+| **10** | **ANALOG GND** ← our ground | | 23 | EXTERNAL MIC IN |
+| **11** | **FIL AUD OUT** ← our audio | | 24 | AUX TX IN2 |
+| 12 | AUX RX IN2 | | 25 | UNIV IO OUT |
+| 13 | MIC IN | | | |
+
+Numbering runs along the rows — **top row 1–13, bottom row 14–25** — so 10 and
+11 are adjacent in the top row and take a twisted pair neatly.
+
+`UNIV IO OUT` (25) can be programmed as buffered discriminator audio, i.e.
+unsquelched. We do **not** want that: the segmenter is built around squelched
+audio, and it would need RSS to change. Noted only so nobody "fixes" pin 11 to
+pin 25 later without understanding the consequence.
+
+#### Verifying the pin numbering before trusting it (do this first)
+
+Viewed from the wire-entry side, left and right flip. Counting from the wrong
+end puts our wires on `MIC IN` and `EMERGENCY` instead of audio and ground.
+**The plug itself settles it**, because Motorola ships it with two standard
+jumpers:
+
+- **1–2** — routes audio to the internal (control head) speaker
+- **4–9** — ties EMERGENCY to digital ground
+
+Pull the plug, put a meter on continuity, and find them. You should measure one
+jumpered pair in **adjacent** positions and one **five apart in the same row**.
+That pattern can only fit one orientation. If it doesn't appear, stop: the
+numbering assumption is wrong and everything downstream of it is too.
+
+Parker's plug as found (2026-10-01) also has a **red wire on a bottom-row
+contact near the left**, consistent with IGNITION (15), far end cut.
+
+#### Hard rules
+
+1. **Connect pins 10 and 11 only.** Nothing else, ever. A two-wire cable
+   physically cannot key a transmitter — which is the point, on a radio that
+   shares a building with a fire department.
+2. **Never ground either speaker lead (1 or 3).** Motorola speaker outputs are
+   **bridged**: neither side sits at ground, and grounding one damages the audio
+   amplifier. This is the trap in the obvious shortcut of tapping speaker audio
+   straight into a sound card. Pin 11 sidesteps it entirely.
+3. **Do not disturb the existing jumpers or the red wire.** New contacts go into
+   empty positions; nothing already in the plug moves.
+
+#### Parts
+
+| Part | Source | Note |
+|---|---|---|
+| D-sub **size 20 socket** contacts, 24–20 AWG — TE **1658537-2** | DigiKey, ~$0.29 each, min qty 1 | Order ~6. The connector takes standard D-sub sockets (0.040" pin), not a Motorola-only part |
+| RCA ground-loop isolator (1:1 transformer pair) | Amazon, ~$10 | Mandatory here, not optional: radio and laptop are both bonded to building earth through mains |
+| RCA cable with one end cut off | already owned | Centre conductor → 11, shield → 10 |
+
+**Avoid 2.0 mm / 24–28 AWG D-sub pins.** Different, smaller contact; a loose
+socket on the radio's pins is the one failure that is expensive to undo.
+
+RCA shield braid crimps badly — **solder these contacts** rather than crimping,
+after tinning the shield tail.
+
+The isolator costs a dB or two of insertion loss and rolls off the low end.
+Both are fine: `input_gain_db` covers the level, and the gate only measures
+300–3400 Hz (D22), below which marine VHF carries nothing anyway.
+
+#### Bring-up order
+
+1. **Confirm Ch 16 receives on this radio at all.** Everything else is wasted
+   effort otherwise. Note the zone and channel position in the bring-up log.
+2. Verify pin numbering via the jumper pattern, above.
+3. Fit contacts to 10 and 11, reinsert the plug.
+4. **Meter before sound card.** Pin 11 to pin 10 should read ≈0 V DC, and show a
+   small AC reading while a transmission is in progress. Do not connect the
+   UCA202 until that passes — DC on an input is how a sound card dies.
+5. Isolator, then UCA202 **RCA left** (`use_channel = 0`, unchanged).
+6. `scripts/level_meter.py`, then `scripts/calibrate.py`.
+7. New rig, new entry in `docs/bringup-log.md`, new thresholds. **No value from
+   the handheld rig transfers** — different radio, different tap point, and a
+   pre-volume one at that (D11).
+
+Pinout and jumper configuration are community-documented
+([accessory pinout thread](https://groups.google.com/g/near-900/c/2BOGhFkXt6o),
+[speaker/jumper discussion](https://forums.radioreference.com/threads/mcs2000-speaker-connection.280841/)),
+cross-checked against three sources and consistent with the plug in hand. The
+scanned Motorola manuals on repeater-builder are the primary source and are
+images, not text — if a number here is ever in doubt, that is where to settle it.
 
 ---
 
