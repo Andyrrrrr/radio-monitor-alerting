@@ -41,7 +41,7 @@
     },
     "bringup_log": {
       "status": "in_progress",
-      "notes": "Entries through 2026-09-23 for both rigs. Parker's knob POSITION is still not written down (the knob is taped, the position is not recorded), so a bump or a re-tape cannot be undone from the docs. Andy's knobs are not taped at all."
+      "notes": "Entries through 2026-10-01, now three rigs. Parker's knob POSITION is still not written down (the knob is taped, the position is not recorded), so a bump or a re-tape cannot be undone from the docs. Andy's knobs are not taped at all."
     }
   },
   "rigs": {
@@ -64,7 +64,7 @@
   },
   "known_issues": [
     {
-      "description": "IN PROGRESS 2026-10-01, a THIRD rig: a spare Motorola MCS 2000 mobile at Parker's fire station (City of Bellingham asset 2168, remote head, Astron RS-35A linear supply on mains). The communications chief authorised modifying THIS radio because it is a spare and not in service - that authorisation does not extend to other station radios. Researched and specified in docs/hardware.md 3.9, nothing wired yet; D-sub size 20 socket contacts (TE 1658537-2) on order. The point of it: the tap is pin 11 FIL AUD OUT on the HLN6412A 25-pin accessory connector (underside of the radio), which is PRE-VOLUME, so the volume-knob dependency and the clipping headroom problem both disappear. Still squelch-gated, so the segmenter is unchanged. Two things are unverified and gate everything else: (1) whether Ch 16 is actually in this radio's codeplug and receives, and (2) the pin numbering, which is confirmed by metering the plug's two factory jumpers (1-2 and 4-9) rather than trusted from the web. Hard rules recorded in the doc: connect pins 10 and 11 only (a two-wire cable cannot key a transmitter), and never ground a speaker lead because the speaker output is bridged.",
+      "description": "IN PROGRESS 2026-10-01, a THIRD rig: a spare Motorola MCS 2000 mobile at Parker's fire station (City of Bellingham asset 2168, remote head, Astron RS-35A linear supply on mains). The communications chief authorised modifying THIS radio because it is a spare and not in service - that authorisation does not extend to other station radios. Researched and specified in docs/hardware.md 3.9, nothing wired yet; D-sub size 20 socket contacts (TE 1658537-2) on order. The point of it: the tap is pin 11 FIL AUD OUT on the HLN6412A 25-pin accessory connector (underside of the radio), which is PRE-VOLUME, so the volume-knob dependency and the clipping headroom problem both disappear. Still squelch-gated, so the segmenter is unchanged. Ch 16 IS receivable on this radio - CONFIRMED 2026-10-01 by ear, zone WDBAND channel WCG16. One thing still gates the build: the pin numbering, which is to be confirmed by metering the plug's two factory jumpers (1-2 and 4-9) rather than trusted from the web. Hard rules recorded in the doc: connect pins 10 and 11 only (a two-wire cable cannot key a transmitter), and never ground a speaker lead because the speaker output is bridged.",
       "severity": "informational"
     },
     {

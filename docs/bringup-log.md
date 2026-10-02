@@ -1066,3 +1066,65 @@ after each transmission ended. Setup notes:
   re-run `calibrate.py` there (D11).
 
 ---
+
+## 2026-10-01 — third rig scoped: MCS 2000 accessory tap, and Ch 16 confirmed on it
+
+**Who:** Parker · **Rig:** NEW — Motorola MCS 2000 at the fire station
+**Session:** research and identification only. **Nothing wired.**
+
+A spare MCS 2000 (City of Bellingham asset 2168, remote head, external Motorola
+speaker, Astron RS-35A linear supply on 115 VAC). The communications chief
+authorised modifying **this** radio because it is a spare and out of service —
+that authorisation does not extend to the other station radios.
+
+Full pinout, tap point, hard rules and build procedure: **`docs/hardware.md`
+§3.9.** Only what happened today is below.
+
+### Ch 16 confirmed — the assumption everything rested on
+
+**Zone `WDBAND`, channel `WCG16`. Marine traffic heard by ear.** Until this,
+every pin number and parts order was speculative work on a radio that might not
+have had Ch 16 in its codeplug at all.
+
+### Connector identification cost most of the session
+
+Three wrong guesses before the right one, all worth recording because the next
+person will make the same ones:
+
+1. **Not the rear panel.** The accessory connector is on the **underside**.
+2. **Not the 18-pin connector on the side** — that is the control head, and its
+   cable is labelled `TO CONTROL HEAD`. Unplugging it takes the radio down.
+3. **Not the Astron supply**, which is the box the radio sits on and looks like
+   part of the radio in photographs.
+
+The connector is an **HLN6412A**, 25-pin, already fitted with the factory
+jumpers (1–2 internal speaker, 4–9 emergency to digital ground) plus a red wire
+on a bottom-row contact consistent with IGNITION. **Both spare-looking gold
+contacts turned out to have wires**, so contacts have to be bought.
+
+### The tap is pre-volume, which retires two standing problems
+
+Pin 11 `FIL AUD OUT` sits before the volume control. The handheld rig's capture
+level depends on the volume knob being at exactly 13 — held by tape and a note —
+and 4 transmissions across three sessions have hit `clip_warn_dbfs`. Neither
+applies to a pre-volume tap. Still squelch-gated, so the segmenter is unchanged.
+
+### Parts ordered
+
+| Part | Source | Note |
+|---|---|---|
+| TE **1658537-2** D-sub size 20 socket contacts ×6 | DigiKey, $0.29 ea, min qty 1 | The connector takes **standard D-sub sockets**, not a Motorola-only part — this is what made same-week shipping possible after eBay looked like the only route |
+| RCA ground-loop isolator | Amazon, ~$10 | Not optional on this rig: radio and laptop are both earthed through mains |
+| RCA cable, one end cut off | already owned | Centre → pin 11, shield → pin 10 |
+
+### Next session
+
+1. **Meter the plug's jumpers first** (one adjacent pair, one five apart in the
+   same row) to prove the pin numbering on the physical connector. Counting from
+   the wrong end lands on `MIC IN` and `EMERGENCY`.
+2. Fit contacts to 10 and 11; **meter 11→10 for DC before the sound card goes
+   anywhere near it.**
+3. `level_meter.py`, `calibrate.py`, new thresholds. Nothing transfers from the
+   handheld rig (D11).
+
+---

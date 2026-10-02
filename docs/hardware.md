@@ -316,8 +316,9 @@ Both are fine: `input_gain_db` covers the level, and the gate only measures
 
 #### Bring-up order
 
-1. **Confirm Ch 16 receives on this radio at all.** Everything else is wasted
-   effort otherwise. Note the zone and channel position in the bring-up log.
+1. ~~**Confirm Ch 16 receives on this radio at all.**~~ **DONE 2026-10-01:**
+   zone **`WDBAND`**, channel **`WCG16`**, marine traffic heard by ear. This was
+   the assumption everything else rested on.
 2. Verify pin numbering via the jumper pattern, above.
 3. Fit contacts to 10 and 11, reinsert the plug.
 4. **Meter before sound card.** Pin 11 to pin 10 should read ≈0 V DC, and show a
