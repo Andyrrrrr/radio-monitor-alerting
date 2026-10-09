@@ -15,6 +15,12 @@ Load-bearing properties, each with a home in the code below:
   degrades to Tier 1, and alert channels fail independently.
 - **File and live sources are interchangeable** (constraint 4): everything
   below the source wrapper is identical, including the 16 kHz resample.
+- **A stalled capture kills the process** (`CaptureStalled`). On 2026-09-23 the
+  USB interface vanished, the process stayed alive and logged nothing for 50
+  minutes, and a quiet channel is indistinguishable from a dead one. Recovery
+  belongs to the supervisor (`systemd Restart=always`), not to in-process
+  reconnect logic: one mechanism covers USB dropout, power cut and unplugged
+  cable, and it cannot half-work.
 
 Usage:
     python -m vhfwatch.pipeline --config config/config.toml
@@ -24,6 +30,7 @@ Usage:
 
 import argparse
 import asyncio
+import time
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -59,6 +66,15 @@ from vhfwatch.web.tokens import mint_share_link
 
 logger = structlog.get_logger(__name__)
 
+
+class CaptureStalled(RuntimeError):
+    """No audio frames arrived within `[health].capture_stall_s`.
+
+    Raised so the process exits non-zero and the supervisor restarts it.
+    Live sources only: a file source legitimately ends.
+    """
+
+
 # Backpressure bound per stage (docs/architecture.md §3). A genuine
 # constant: Ch 16 is silent 97-99% of the time, so 32 in-flight segments
 # already means transcription has fallen minutes behind.
@@ -79,6 +95,8 @@ class PipelineStats:
     incidents_opened: int = 0
     queue_drops: int = 0
     alerts_sent: int = 0
+    # Wall-clock-independent: monotonic, so a clock step cannot fake liveness.
+    last_frame_at: float = field(default_factory=time.monotonic)
     _open_incident_ids: set[str] = field(default_factory=set)
 
 
@@ -164,8 +182,19 @@ async def run(
             source_name=source.name,
         )
 
+        # Set when ingest finishes, so the watchdog stops watching a source
+        # that ended on purpose rather than reporting a false stall.
+        ingest_done = asyncio.Event()
+
         async def ingest() -> None:
+            try:
+                await _ingest_frames()
+            finally:
+                ingest_done.set()
+
+        async def _ingest_frames() -> None:
             async for frame in source.frames():
+                stats.last_frame_at = time.monotonic()
                 for tx in segmenter.push(frame):
                     await _archive_and_store(db, tx, audio_dir, cfg)
                     stats.transmissions += 1
@@ -303,10 +332,39 @@ async def run(
                         "changed in the audio chain",
                     )
 
+        async def capture_watchdog() -> None:
+            """Assert frames are still ARRIVING, not merely that we are alive.
+
+            The noise-floor drift warning is not a substitute: it fires only
+            when the estimate MOVES, and a dead stream moves nothing.
+            """
+            stall_s = float(cfg.health.capture_stall_s)
+            interval = min(stall_s / 2.0, _TICK_INTERVAL_S)
+            while True:
+                try:
+                    await asyncio.wait_for(ingest_done.wait(), timeout=interval)
+                    return  # the source ended deliberately; nothing to watch
+                except TimeoutError:
+                    pass
+                silent_for = time.monotonic() - stats.last_frame_at
+                if silent_for > stall_s:
+                    logger.error(
+                        "audio.capture_stalled",
+                        silent_for_s=round(silent_for, 1),
+                        capture_stall_s=stall_s,
+                        hint="no frames from the audio source — exiting so the "
+                        "supervisor restarts us (docs/hardware.md §3.9)",
+                    )
+                    raise CaptureStalled(
+                        f"no audio frames for {silent_for:.0f}s (limit {stall_s:.0f}s)"
+                    )
+
         ticker = asyncio.create_task(tick_quiet_incidents())
         try:
             async with asyncio.TaskGroup() as tg:
                 tg.create_task(ingest())
+                if source.name == "live":
+                    tg.create_task(capture_watchdog())
                 tg.create_task(transcribe())
                 tg.create_task(detect())
         finally:
@@ -432,6 +490,15 @@ def main(argv: list[str] | None = None) -> None:
         asyncio.run(run(cfg, source))
     except KeyboardInterrupt:
         logger.info("pipeline.stopped", reason="keyboard interrupt")
+    except BaseExceptionGroup as eg:
+        # TaskGroup wraps; subgroup() also handles nesting. Anything that
+        # isn't a stall propagates untouched — this is not a catch-all.
+        if eg.subgroup(CaptureStalled) is None:
+            raise
+        # Non-zero exit is the point: systemd Restart=always brings us back
+        # with a fresh audio stream. Do not try to recover in-process.
+        logger.error("pipeline.stopped", reason="capture stalled")
+        raise SystemExit("audio capture stalled; exiting for restart") from None
 
 
 if __name__ == "__main__":

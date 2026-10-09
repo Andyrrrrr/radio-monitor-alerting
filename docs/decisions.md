@@ -638,3 +638,94 @@ and that makes the isolator a Phase 4 item; (b) `calibrate.py` shows the
 band-limited floor creeping toward −28.9 after any change to the power setup —
 re-running it is the 30-second early warning; (c) the rig moves to a mains
 supply with a worse ground path than this one.
+
+---
+
+## D24 — A stalled capture kills the process; the supervisor restarts it
+
+**Decided 2026-10-09**, building toward the unattended week-long run.
+
+**The failure this exists for:** on 2026-09-23 the USB interface vanished. The
+pipeline **stayed alive, logged nothing for ~50 minutes**, and later flushed a
+stalled buffer as a bogus transmission timestamped 47 minutes in the past. The
+noise-floor drift warning did not fire, because it only fires when the estimate
+**moves**, and a dead stream moves nothing. Only a side check — opening the
+device directly — caught it.
+
+**Decision:** the pipeline now runs a `capture_watchdog` task that asserts
+audio **frames are still arriving**, and raises `CaptureStalled` if none arrive
+for `[health].capture_stall_s` (default 30). That propagates out of the
+TaskGroup and exits the process non-zero.
+
+**Why crash instead of reconnect in-process.** `LiveAudioSource` already has
+reopen-with-backoff logic, and it did not save us: the stream did not error, it
+simply stopped delivering. In-process recovery means more paths, more states,
+and more ways to half-work — and the half-working state is the dangerous one,
+because it looks healthy. A crash plus `systemd Restart=always` is **one
+mechanism that covers USB dropout, power loss and an unplugged cable**, and it
+cannot half-work. The operator has said explicitly that missing transmissions
+during a restart is acceptable; silent failure is not.
+
+**Why frames, not audio level.** Silence on Ch 16 is *quiet frames*, not an
+absence of frames — the channel is quiet for hours at a stretch (0.3–1.4
+transmissions/hour). Gating on level would fire constantly; gating on frame
+arrival is unambiguous. `stats.last_frame_at` is **monotonic**, so a clock step
+cannot fake liveness.
+
+**Scope, deliberately narrow:** armed for live sources only (`source.name ==
+"live"`), and disarmed as soon as ingest finishes — a file source ending is not
+a stall. The first draft got this wrong and the quiet-channel test caught it.
+
+**What this does NOT cover,** and is still Phase 4 work: a radio that is
+powered off or tuned away, an antenna knocked loose, or a channel changed by a
+passer-by. All of those deliver perfectly good frames of silence. The
+"no transmission in N hours" alert is what catches them.
+
+**Revisit when:** restarts become frequent enough to lose meaningful traffic —
+at which point the fix is to find out why capture keeps dying, not to soften
+the watchdog.
+
+---
+
+## D25 — faster-whisper is viable for deployment: it recovers what MLX drops, and hallucinates more on noise
+
+**Measured 2026-10-09** over **20 real transmissions (148 s)** — the Coast
+Guard assistance case of 2026-09-23 plus the MCS 2000 bring-up traffic. First
+time `faster-whisper` has ever processed real audio on this project; it was not
+even installed in the dev venv until this session.
+
+**Speed, same machine (M-series CPU, int8):** MLX **9.1× realtime**,
+faster-whisper **3.2× realtime**. Both are far faster than needed at
+~1 transmission/hour. Not a selection criterion.
+
+**Agreement:** only **2 of 20 transcripts identical** — both of those the
+cleanest recordings (SNR 54 and the one unambiguous sentence). On marginal
+audio the engines diverge substantially, so **they are not interchangeable and
+transcripts are not comparable across engines.** Any WER or precision/recall
+baseline must record which engine produced it.
+
+**faster-whisper is better where it matters most.** On two transmissions MLX
+emitted only `"!"` and faster-whisper recovered real content, including
+`"...off of Lopez Island, this is United States Coast Guard on channel 1-6"` —
+**a position**, which is exactly the information a distress case turns on.
+
+**And worse in a way the project already defends against.** On two
+transmissions where MLX correctly produced nothing, faster-whisper produced
+hallucination loops (`"Uh, uh, uh, …"`, `"sail, sail, sail, …"`) and took
+**9.1 s and 6.0 s to decode 1.9 s and 2.5 s of audio** — runaway decoding, a
+latency risk as well as a content one. `max_repeat_tokens = 3` catches both
+cases before detection, which is the gate doing its job.
+
+**Decision:** faster-whisper is fit for the x86 deployment host, as
+`docs/conventions.md` §5 already assumed. The hallucination gate is
+**load-bearing for it in a way it is not for MLX** — do not weaken
+`max_repeat_tokens` without re-running this comparison.
+
+**Open:** neither engine is validated against ground truth, because nobody has
+hand-labelled `data/labels.jsonl`. This compares engines to each other, not to
+what was actually said. The recordings all exist, so the labelling is still the
+cheapest accuracy work available.
+
+**Revisit when:** labels exist (then measure WER properly), or when the station
+host is running and latency under real load can be measured on the N100 rather
+than inferred from a Mac.

@@ -206,6 +206,10 @@ class StorageConfig(_Section):
 class HealthConfig(_Section):
     no_audio_alert_hours: int = 6  # total silence on Ch 16 means something broke
     heartbeat_timeout_s: int = 120
+    # Exit if no audio FRAMES arrive for this long. Frames keep coming while
+    # the channel is silent — silence is quiet frames, not no frames — so this
+    # catches a dead capture, which a quiet channel is otherwise identical to.
+    capture_stall_s: int = 30
     self_test_hour: int = 9  # local hour for daily end-to-end test
     min_free_disk_gb: int = 5
 

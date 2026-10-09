@@ -153,5 +153,14 @@ retention_days     = 90        # 0 = keep forever; set deliberately
 [health]
 no_audio_alert_hours = 6       # total silence on Ch 16 means something broke
 heartbeat_timeout_s  = 120
+capture_stall_s      = 30      # exit if no audio FRAMES arrive for this long.
+                               # Frames keep coming while the channel is quiet
+                               # (silence is quiet frames, not no frames), so
+                               # this catches a dead capture chain, which is
+                               # otherwise indistinguishable from a quiet
+                               # channel. On 2026-09-23 a USB interface vanished
+                               # and nothing noticed for 50 minutes. Exit is
+                               # deliberate: the supervisor (systemd
+                               # Restart=always) restarts with a fresh stream.
 self_test_hour       = 9       # local hour for daily end-to-end test
 min_free_disk_gb     = 5
