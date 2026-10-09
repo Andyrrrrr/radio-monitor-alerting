@@ -1201,6 +1201,35 @@ channel: tail −89.5, and the numbers in the table above.
 ~10 dB above the median, the run is contaminated. Here the final spread was
 1.8 dB.
 
+### 16:41 — the first EAR-CONFIRMED unintelligible transmission
+
+Two transmissions at 16:41:43 (3.3 s) and 16:41:47 (1.9 s), at **SNR 58.7 and
+57.8 dB — the cleanest signals this project has ever recorded.** Neither
+transcribed:
+
+| | 16:41:43 | 16:41:47 |
+|---|---|---|
+| MLX | `"!"` | `"Japan, go down."` — rejected, avg_logprob −1.21 |
+| faster-whisper | `"This is your team."` ×4 (loop) | `"Capac, go south."` |
+
+**The operator listened and could not read it either** — his read was a distant
+station. That makes this the first case where an unreadable transcript is
+confirmed to be unintelligible AUDIO rather than a model failure, and it
+settles two things:
+
+1. **A bigger model will not help this class of transmission.** The
+   information is not in the recording. Do not spend the `medium.en`
+   comparison on cases like this one.
+2. **`est_snr_db` is now definitively disproven as a quality measure** — 58.7
+   dB on audio no human can read, on a chain 50 dB quieter than the rig where
+   the finding was first raised (2026-09-07). FM delivers full-level audio
+   whether the station is next door or at the edge of range; only
+   intelligibility degrades. Every remaining use of this metric should be read
+   as "how far above the noise floor", never "how readable".
+
+Both gates behaved correctly: MLX's guess was rejected on confidence, and
+faster-whisper's loop is what `max_repeat_tokens` exists for.
+
 ### Open items
 
 - **The ground-loop isolator is NOT in the chain.** It was removed during
