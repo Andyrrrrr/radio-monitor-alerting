@@ -40,7 +40,7 @@ Settled questions with reasoning, so they don't get relitigated mid-build. If yo
 **Rejected along the way:**
 - **MacBook 3.5 mm jack direct** — TRRS combo jack, not a line input. Needs the signal on the mic contact plus 20–30 dB attenuation plus a TRS-to-TRRS adapter, and macOS may never switch into headset mode. Too many identical-looking failure modes for someone debugging solo.
 - **Cheap CM108-class USB dongles** — workable, but mic-level inputs needing an attenuator, and "line-in" labeling on budget devices is unreliable.
-- **UCA202 chosen** for Parker: genuine line-level RCA inputs, no attenuator needed, class compliant, well-known quantity.
+- **UFO202 chosen** for Parker: genuine line-level RCA inputs, no attenuator needed, class compliant, well-known quantity.
 
 ---
 
@@ -123,7 +123,7 @@ Settled questions with reasoning, so they don't get relitigated mid-build. If yo
 
 ## D11 — Two development rigs, per-machine calibration
 
-**Decided.** Andy on a MOTU M2, Parker on a Behringer UCA202. Both supported.
+**Decided.** Andy on a MOTU M2, Parker on a Behringer UFO202. Both supported.
 
 **Why:** it's what each person has. Also a useful forcing function — it keeps device-specific assumptions out of the pipeline.
 
@@ -303,7 +303,7 @@ recalibration, not a wholesale shift of gain to the interface.
 ## D19 — Parker's rig runs provisionally on a 30 dB elevated floor, accepting weak-signal loss until it is diagnosed
 
 **Decided 2026-09-07 by Parker, measured on "Parker's Calibration Machine"
-(Behringer UCA202 + Kenwood NX-5200).** Measured floor is **−38.3 dBFS**, with the
+(Behringer UFO202 + Kenwood NX-5200).** Measured floor is **−38.3 dBFS**, with the
 measurement conditions owner-confirmed (radio in normal monitoring state,
 nothing transmitting), against the M2 rig's **−68.1** — a 30 dB gap between two rigs running the
 same radio model with the squelch closed on both. Thresholds are set from
@@ -318,14 +318,14 @@ by default. Both rigs are in the same squelch state. The 30 dB is a
 difference in the rest of the chain.
 
 **Gain staging was the first hypothesis, and the knob position falsifies it.**
-The guess was that the UCA202's missing input trim forced the radio's volume
+The guess was that the UFO202's missing input trim forced the radio's volume
 far above Andy's 3/4, lifting the radio's own amp noise. Parker's knob is
 **17 of 0–31** — *below* Andy's ≈23. Comparing dynamic range rather than
 absolute level: Andy gets 60.5 dB peak-to-floor (−7.6 / −68.1), Parker gets
 29.1 dB (−9.2 / −38.3). **31 dB less usable range with the radio turned down
 further.** Radio amp noise scales with the volume setting, so a lower knob
 should yield a relatively lower floor; it does not. The noise therefore
-enters **downstream of the radio's volume control** — cable, UCA202, USB
+enters **downstream of the radio's volume control** — cable, UFO202, USB
 power, or charger.
 
 **This inverts the obvious fix, and makes the rig a second instance of D18
@@ -336,7 +336,7 @@ stage that moves signal without moving the interference, so turning it *up*
 helps; ADC headroom caps that at about 3 dB (peaks −9.2, ceiling −6). Worth
 taking, nowhere near sufficient.
 
-**That measurement was run, and it clears the interface.** UCA202 alone with
+**That measurement was run, and it clears the interface.** UFO202 alone with
 nothing on its inputs: **−88.8 dBFS** (p90 −88.7), against −38.3 with the
 radio connected. −88.8 is the converter's own floor and 20 dB below the
 entire M2 chain. Interface, USB power and host are eliminated; **all ~50 dB
@@ -382,7 +382,7 @@ charging+transmission, reading the `voice` and `hum` bands separately);
 (b) the radio volume knob position is recorded and compared against Andy's
 3/4, and a lower-knob / `input_gain_db` split is measured against the
 current one — measure both splits and compare idle floors, per §3.5's
-instruction not to assume which stage dominates; (c) the UCA202 is
+instruction not to assume which stage dominates; (c) the UFO202 is
 substituted or the radio swapped, isolating which box carries the noise;
 (d) `evaluate.py` on real corpus shows the miss rate is worse than "some
 weak stations" — the assumption that speech RMS sits near −22 to −28 is

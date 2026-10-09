@@ -61,7 +61,7 @@ mypy --strict src
 
 ### Two development rigs
 
-Andy runs a MOTU M2, Parker a Behringer UCA202 (`docs/decisions.md` D11). Both are just Core Audio input devices to the code — **keep it that way.** Device name, channel, gain, and thresholds all come from per-machine config.
+Andy runs a MOTU M2, Parker a Behringer UFO202 (`docs/decisions.md` D11). Both are just Core Audio input devices to the code — **keep it that way.** Device name, channel, gain, and thresholds all come from per-machine config.
 
 Corpus audio is shareable between rigs. Calibration values are not — they're properties of one radio + cable + interface + knob position. Never hardcode a threshold that came from one person's setup, and check segmenter changes against both rigs' audio when you can.
 

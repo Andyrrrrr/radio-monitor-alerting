@@ -63,7 +63,7 @@ Voice is the only signal this project relies on. DSC and AIS are richer and more
 - A VHF receiver with an audio output, and a way to get that audio into a computer
 - macOS (Apple Silicon or Intel) or Linux x86-64
 
-POC hardware: Kenwood NX-5200 (already programmed with marine channels) → multi-pin→K1 audio adapter → a line-level USB audio interface (Behringer UCA202 or MOTU M2) → MacBook Pro. See `docs/hardware.md` for cable specs per rig, level calibration, and a bring-up procedure that isolates each link in the chain.
+POC hardware: Kenwood NX-5200 (already programmed with marine channels) → multi-pin→K1 audio adapter → a line-level USB audio interface (Behringer UFO202 or MOTU M2) → MacBook Pro. See `docs/hardware.md` for cable specs per rig, level calibration, and a bring-up procedure that isolates each link in the chain.
 
 ## Documentation
 

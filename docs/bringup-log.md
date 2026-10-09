@@ -9,7 +9,7 @@ Template below — copy the block for each session.
 ## YYYY-MM-DD — session title
 
 **Who:** 
-**Rig:** (Andy/M2 or Parker/UCA202)
+**Rig:** (Andy/M2 or Parker/UFO202)
 **Location:** 
 **Weather / time of day:** (affects propagation and traffic volume)
 
@@ -28,7 +28,7 @@ Template below — copy the block for each session.
 | Antenna location | |
 | Battery / power | |
 | Audio adapter | multi-pin → K1 2-pin |
-| **Rig** | UCA202 / M2 |
+| **Rig** | UFO202 / M2 |
 | Cable to interface | 3.5mm→dual RCA / 3.5mm→dual 1/4" TS |
 | Audio interface | |
 | **Radio volume knob position** | (tape it and note it) |
@@ -105,7 +105,7 @@ First bring-up session for either rig. Steps 3, 4 and 5 of `docs/hardware.md` §
 | Audio interface | MOTU M2, **input 2** (input 1 carries Andy's XLR mic) |
 | **Capture channel** | `use_channel = 1` (input 2 → channel 1) |
 | **M2 input 2 trim** | **90°**, after being reduced ~10.5 dB from its initial position during this session |
-| **macOS input slider** | **none exists.** The M2 exposes no software-controllable input gain to macOS, so there is no slider to reset or to lose across reboots. One less thing to record — and unlike the UCA202 case in §3.5, not a lost gain stage, because the M2 has a hardware trim |
+| **macOS input slider** | **none exists.** The M2 exposes no software-controllable input gain to macOS, so there is no slider to reset or to lose across reboots. One less thing to record — and unlike the UFO202 case in §3.5, not a lost gain stage, because the M2 has a hardware trim |
 | `input_gain_db` in config | 0.0 (not needed — analog level is correct) |
 | Sample rate | 48 kHz, set in Audio MIDI Setup; **survived a dock reconnect** |
 | 48V phantom / Hi-Z | ⚠️ TO CONFIRM OFF on channel 2 |
@@ -218,8 +218,8 @@ First session. Before this, no rig had been verified at all.
 ## 2026-09-07 — Parker's Calibration Machine: level set and floor calibrated on an unsquelchable rig
 
 **Who:** Parker
-**Rig:** Parker/UCA202 — referred to as **"Parker's Calibration Machine"**
-**Location:** Parker's fire station (all Parker/UCA202 sessions are here — the "desk" and "window" positions below are both inside it)
+**Rig:** Parker/UFO202 — referred to as **"Parker's Calibration Machine"**
+**Location:** Parker's fire station (all Parker/UFO202 sessions are here — the "desk" and "window" positions below are both inside it)
 **Weather / time of day:** ~09:50 local (America/Los_Angeles)
 
 First bring-up session for this rig. Level is set and the floor is measured.
@@ -243,15 +243,15 @@ is put into service on the measured number provisionally
 | Antenna location | ⚠️ TO CONFIRM |
 | Battery / power | ⚠️ **TO CONFIRM — and it matters more here than anywhere else in this table.** Whether the radio was on the charger during these measurements is unresolved, and charger noise is the leading candidate for the high floor. See "What broke / still unknown" |
 | Audio adapter | multi-pin → K1 2-pin |
-| **Rig** | Behringer UCA202 |
+| **Rig** | Behringer UFO202 |
 | Cable to interface | 3.5 mm → dual RCA |
-| Audio interface | UCA202, **RCA left** |
+| Audio interface | UFO202, **RCA left** |
 | **Capture channel** | `use_channel = 0` |
-| **Interface trim** | **none exists** — the UCA202's front knob is headphone output only. The radio's volume knob is the only analog gain stage on this rig |
+| **Interface trim** | **none exists** — the UFO202's front knob is headphone output only. The radio's volume knob is the only analog gain stage on this rig |
 | **macOS input slider** | ⚠️ TO CONFIRM (§3.5 — check System Settings → Sound → Input; may be greyed out) |
 | `input_gain_db` in config | 0.0 — not needed, analog level is correct |
 | Sample rate | 48 kHz |
-| 48V phantom / Hi-Z | n/a on the UCA202 |
+| 48V phantom / Hi-Z | n/a on the UFO202 |
 | Host machine | MacBook (Apple Silicon) |
 | Device name matched | `USB Audio CODEC` (substring match; resolved to index 2 this session) |
 
@@ -299,7 +299,7 @@ open-squelch hiss. It does not — the NX-5200 has no squelch control on
 Both rigs are in the same state, so the 30 dB lives in the rest of the chain.
 
 **That hypothesis was gain staging, and the knob position falsifies it.**
-The first guess was that the UCA202's missing input trim forced the radio's
+The first guess was that the UFO202's missing input trim forced the radio's
 volume much higher than Andy's, lifting the radio's own amp noise. Parker's
 knob is **17 of 0–31**, *below* Andy's 3/4 (≈23). Comparing dynamic range
 rather than absolute level:
@@ -307,12 +307,12 @@ rather than absolute level:
 | | Peak | Floor | Peak-to-floor |
 |---|---|---|---|
 | Andy/M2 | −7.6 | −68.1 | **60.5 dB** |
-| Parker/UCA202 | −9.2 | −38.3 | **29.1 dB** |
+| Parker/UFO202 | −9.2 | −38.3 | **29.1 dB** |
 
 31 dB less usable range *with the radio turned down further.* Radio amp noise
 would scale with the volume setting, so a lower knob should give a relatively
 lower floor. It does not. **The noise enters downstream of the radio's volume
-control** — cable, UCA202, USB power, or charger.
+control** — cable, UFO202, USB power, or charger.
 
 **Consequence, and it inverts the obvious fix:** `input_gain_db` sits
 downstream of the noise source and amplifies signal and noise equally, so it
@@ -322,14 +322,14 @@ without moving the interference. Turning the radio *up* would improve SNR —
 but ADC headroom caps that at roughly 3 dB (peaks are at −9.2, the ceiling is
 −6), so it is worth taking and nowhere near a fix.
 
-**The cable-pull test was run the same session and settles it: the UCA202 is
+**The cable-pull test was run the same session and settles it: the UFO202 is
 clean.** With nothing plugged into its inputs, floor **−88.8 dBFS** (p90
 −88.7, peak −72.2) against **−38.3** with the radio connected.
 
 | Configuration | Floor | p90 |
 |---|---|---|
-| Radio + cable + UCA202 | −38.3 | −38.3 |
-| UCA202 alone, inputs open | **−88.8** | −88.7 |
+| Radio + cable + UFO202 | −38.3 | −38.3 |
+| UFO202 alone, inputs open | **−88.8** | −88.7 |
 
 −88.8 is the converter's own noise floor, and **20 dB quieter than the entire
 M2 chain** (−68.1). The interface, its USB power, and the host are all
@@ -463,7 +463,7 @@ verified end to end and its thresholds were theory-derived guesses.
 ## 2026-09-07 (afternoon) — Parker's rig: the receiver is deaf, and the audio chain is not the reason
 
 **Who:** Parker
-**Rig:** Parker/UCA202 ("Parker's Calibration Machine")
+**Rig:** Parker/UFO202 ("Parker's Calibration Machine")
 **Sessions:** 10:26–10:57 (30 min), 11:45–12:05 (20 min), 12:17–12:19 (2 min, no traffic)
 
 Nothing was changed on the rig between these sessions.
@@ -485,7 +485,7 @@ station.
 ### What was ruled out, and how
 
 - **The audio chain.** The idle floor is −38.1 dBFS, matching every session with
-  the radio connected, versus −88.8 with the UCA202's inputs open. Cable,
+  the radio connected, versus −88.8 with the UFO202's inputs open. Cable,
   interface, host, capture code and thresholds are all fine.
 - **Any change between sessions.** The two recordings are **spectrally
   identical** — same mains-dominant idle signature, same rolloff in every band,
@@ -540,7 +540,7 @@ nothing else means RF is not reaching the radio, and antenna/position is next.
 
 ## 2026-09-07 (late afternoon) — RESOLVED: the radio was in the wrong place
 
-**Who:** Parker · **Rig:** Parker/UCA202 · **Session:** 12:59–13:17 (18.2 min)
+**Who:** Parker · **Rig:** Parker/UFO202 · **Session:** 12:59–13:17 (18.2 min)
 
 **The radio was moved from the desk into the window. Nothing else changed.**
 
@@ -609,7 +609,7 @@ morning.
 
 ## 2026-09-07 (evening) — recalibrated at volume 13 in the window position
 
-**Who:** Parker · **Rig:** Parker/UCA202
+**Who:** Parker · **Rig:** Parker/UFO202
 
 Radio volume reduced **17 → 13** (of 0–31) to stop the clipping that appeared
 once the window position made reception work. Recalibrated in place.
@@ -655,7 +655,7 @@ to the threshold, the volume reduction went too far and 14–15 is the compromis
 
 ## 2026-09-07 (afternoon, 2h14m) — volume 13 verified; two new findings from real traffic
 
-**Who:** Parker · **Rig:** Parker/UCA202, window position, volume 13/31
+**Who:** Parker · **Rig:** Parker/UFO202, window position, volume 13/31
 **Session:** 13:48–16:01 (2 h 14 min, 9 files, ~1.3 GB)
 
 ### Volume 13 verified — the clipping is gone
@@ -723,7 +723,7 @@ to its specification. Written up before proposing any change to the gating.
 
 ## 2026-09-10 — NA-773 antenna installed; laptop mains supply found injecting 9 dB of hum
 
-**Who:** Parker · **Rig:** Parker/UCA202, fire station, window position, volume 13/31
+**Who:** Parker · **Rig:** Parker/UFO202, fire station, window position, volume 13/31
 **Session:** 08:04:39 – 09:32:29 (1 h 28 min, 6 files)
 
 **Only the antenna changed** since 2026-09-07 — same site, same window
@@ -784,7 +784,7 @@ no warning. A floor can be perfectly stable and still be 9 dB too high.
 
 ## 2026-09-10 (later) — band-limited gate enabled so the laptop can stay plugged in
 
-**Who:** Parker · **Rig:** Parker/UCA202, fire station, window, volume 13, NA-773
+**Who:** Parker · **Rig:** Parker/UFO202, fire station, window, volume 13, NA-773
 
 The operator needs the laptop on mains for extended runs, which puts 8.9 dB of
 supply hum on the idle line (D21). Rather than depend on remembering to
@@ -845,7 +845,7 @@ speech windows clear the −28.9 open threshold.
 
 ## 2026-09-15 — 6 h 37 m live watch: 2 of 2 against the ear log, and volume 13 has no headroom left
 
-**Who:** Parker · **Rig:** Parker/UCA202, fire station, window, volume 13/31, NA-773
+**Who:** Parker · **Rig:** Parker/UFO202, fire station, window, volume 13/31, NA-773
 **Session:** 10:04:32 – 16:41:55 local (6 h 37 min, live pipeline, not `record_corpus.py`)
 
 **Nothing was changed.** Same site, window position, volume, antenna and config
@@ -940,7 +940,7 @@ watchwords ran and correctly fired nothing.
 
 ## 2026-09-23 — Pushover proven end to end; a real Coast Guard case that fired no alert; and capture died silently for 50 minutes
 
-**Who:** Parker · **Rig:** Parker/UCA202, fire station, window, volume 13/31, NA-773
+**Who:** Parker · **Rig:** Parker/UFO202, fire station, window, volume 13/31, NA-773
 **Session:** 08:06:45 – 17:31:21 local trustworthy (9 h 25 min), stopped 18:25
 **Unchanged** from 2026-09-15: same site, window position, volume, antenna, config.
 
@@ -1003,7 +1003,7 @@ the boat, and it is on the audio but not in the text.
 
 ### CAPTURE DIED SILENTLY AT ~17:31 AND NOTHING NOTICED FOR 50 MINUTES
 
-The UCA202 vanished from the system — absent from `audio_devices.py` and from
+The UFO202 vanished from the system — absent from `audio_devices.py` and from
 the USB bus — and:
 
 - the pipeline process **stayed alive and logged nothing**;

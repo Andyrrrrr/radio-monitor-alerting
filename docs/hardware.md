@@ -16,7 +16,7 @@ Development happens on two different audio front-ends. **This is supported delib
 | Radio | Kenwood NX-5200 | Kenwood NX-5200 |
 | Adapter | multi-pin → K1 2-pin | multi-pin → K1 2-pin |
 | Cable | 3.5 mm TRS → dual 1/4" **TS** | 3.5 mm TRS → dual **RCA** |
-| Interface | **MOTU M2**, input **2**, 1/4" line | **Behringer UCA202**, RCA L/R |
+| Interface | **MOTU M2**, input **2**, 1/4" line | **Behringer UFO202**, RCA L/R |
 | Capture channel (`use_channel`) | **1** (M2 in 1 = ch 0, in 2 = ch 1) | 0 |
 | Input type | Balanced TRS (**cancellation risk**, §3.4) | Unbalanced RCA (no such risk) |
 | Hardware input trim | Yes, per-channel knob | **No** — fixed line level |
@@ -73,7 +73,7 @@ The **multi-pin → K1 2-pin adapter** is what gives you audio: a **3.5 mm speak
 
 **Verify your adapter in thirty seconds:** plug wired earphones into the 3.5 mm side, power the radio, open squelch. Hiss in the earphones means you have a working analog audio tap. That single test settles it. If it terminates in USB or DB9, it's a data cable regardless of the listing.
 
-### 3.2 Parker's chain — UCA202
+### 3.2 Parker's chain — UFO202
 
 ```
 NX-5200
@@ -81,7 +81,7 @@ NX-5200
        └─ [multi-pin → K1 2-pin adapter]
             └─ 3.5 mm TRS speaker out
                  └─ [3.5 mm TRS → dual RCA cable]
-                      └─ Behringer UCA202, RCA inputs L/R
+                      └─ Behringer UFO202, RCA inputs L/R
                            └─ USB → MacBook
                                 └─ Core Audio, 48 kHz, 2-in
                                      └─ sounddevice, CHANNEL 0 ONLY
@@ -89,9 +89,27 @@ NX-5200
 
 **Advantages of this rig:** RCA inputs are **unbalanced**, so the phase-cancellation trap in §3.4 does not apply. Inputs are genuine line level, so **no attenuator is needed.** Class compliant — no drivers.
 
-**Limitation: no hardware input gain.** The UCA202's front knob controls *headphone output only* and has no effect on the recorded signal. See §3.5.
+> ⚠️ **The UFO202 has a LINE / PHONO switch. It must be on LINE.**
+> On PHONO the built-in phono preamp adds roughly 35–40 dB of gain and RIAA
+> equalization — about 20 dB of bass boost and a treble cut. Nothing in the
+> logs would name the cause: levels would simply be enormous, hum would
+> dominate, and every threshold would be wrong.
+>
+> **Model corrected 2026-10-09.** Every doc in this set said UCA202 from the
+> first session through 2026-10-01. It has always been a **UFO202** — both
+> enumerate as `USB Audio CODEC`, so nothing caught it. The UCA202 has no such
+> switch, which is why the gotcha above went unwritten for two months.
+>
+> **Hypothesis raised and rejected the same day:** this rig's noise floor sits
+> ~30 dB above the M2 rig's with the squelch closed on both (§3.5), cause
+> undiagnosed since 2026-09-07, and a phono preamp left switched on would have
+> explained it exactly — including D21's hum, which is the shape RIAA bass
+> boost produces. **The switch was verified on LINE before being touched.**
+> The 30 dB gap remains unexplained; it is not this.
 
-The UCA202 is 16-bit/48 kHz. Irrelevant here — marine VHF audio is ~3 kHz bandwidth and heavily noise-limited long before bit depth matters.
+**Limitation: no hardware input gain.** The UFO202's front knob controls *headphone output only* and has no effect on the recorded signal. See §3.5.
+
+The UFO202 is 16-bit/48 kHz. Irrelevant here — marine VHF audio is ~3 kHz bandwidth and heavily noise-limited long before bit depth matters.
 
 ### 3.3 Andy's chain — MOTU M2
 
@@ -119,11 +137,11 @@ This looks exactly like a broken adapter or a radio that isn't receiving. It is 
 
 **Avoid it with an unbalanced mono connection:** use a **3.5 mm TRS → dual 1/4" TS** Y-cable and plug **one leg** into the radio's input (input 2 on Andy's rig). A TS plug shorts ring to sleeve, so the M2 sees tip minus ground = your signal. Do **not** use a 3.5 mm TRS → 1/4" TRS cable.
 
-**This does not apply to the UCA202.** RCA is unbalanced by construction.
+**This does not apply to the UFO202.** RCA is unbalanced by construction.
 
 ### 3.5 Gain structure and calibration
 
-**On the UCA202 rig the radio's volume knob may be your only gain control.** The UCA202 has no input trim, and macOS may grey out the input volume slider for devices that don't expose software-controllable input gain. Check System Settings → Sound → Input; if the slider is adjustable, that's a usable second stage, if not, the radio knob is it.
+**On the UFO202 rig the radio's volume knob may be your only gain control.** The UFO202 has no input trim, and macOS may grey out the input volume slider for devices that don't expose software-controllable input gain. Check System Settings → Sound → Input; if the slider is adjustable, that's a usable second stage, if not, the radio knob is it.
 
 **Confirmed 2026-08-12 on the M2:** macOS shows *no* input slider for it at all. That's fine on this rig — the hardware trim is the real gain stage — and it means there's no software slider to be reset by a reboot. Don't go looking for one.
 
@@ -144,7 +162,7 @@ input_gain_db = 0.0   # post-capture digital gain
 4. **Radio volume to roughly 1/3** and adjust from there. Radio speaker amps distort when driven hard, and distortion introduced at the radio cannot be undone downstream — it degrades transcription more than low level does. Keep the radio clean.
 
    ⚠️ **This ordering assumes the radio is the noisiest stage. Check that before applying it.** If your rig picks up interference on the *cable* — downstream of the radio's volume knob, as the M2 rig does (§3.4 territory, 60 Hz pickup on a muted output) — then the interface trim amplifies signal and interference equally, and the radio's volume is the *only* control that improves SNR. On such a rig the correct staging is the opposite: **radio as high as it goes without distorting, trim as low as will avoid clipping.** Moving gain from the radio to the interface cost the M2 rig **30 dB of noise floor** for 8 dB of signal (`docs/bringup-log.md` 2026-08-12, `docs/decisions.md` D18). Decide which stage dominates by measuring the idle floor at two different splits, not by assuming.
-5. On the M2, bring up input 1 trim while watching the meters. On the UCA202, adjust the radio knob (and the macOS slider if available) while watching levels in `scripts/calibrate.py`.
+5. On the M2, bring up input 1 trim while watching the meters. On the UFO202, adjust the radio knob (and the macOS slider if available) while watching levels in `scripts/calibrate.py`.
 6. Target: **open-squelch noise around −45 to −35 dBFS**, **speech peaks −12 to −6 dBFS**, never touching 0.
 7. **Tape every knob you set.** Radio volume, and M2 trim if applicable. Bumping one degrades detection silently.
 8. **Measure the noise floor with squelch CLOSED and nobody transmitting** (`scripts/calibrate.py`), and record it in `config.toml` so the VAD threshold derives from measurement, not a guess. Closed is the condition that matters: the gate's job is to clear whatever the line does when there's no signal. Squelch-open hiss is a trim-setting signal, not a floor. Also record the macOS input slider position in the bring-up log — it doesn't always survive reboots or device reconnects.
@@ -164,7 +182,7 @@ rig with a *lower* knob and *worse* peak-to-floor has its noise entering
 somewhere downstream of that knob (cable, interface, USB power, charger), and
 no interface trim or `input_gain_db` can improve it — both scale signal and
 noise together. This is the same argument as `docs/decisions.md` D18, and it
-decided the Parker/UCA202 rig too: 17/31 on the knob against Andy's ≈23, and
+decided the Parker/UFO202 rig too: 17/31 on the knob against Andy's ≈23, and
 29.1 dB of range against his 60.5 dB (`docs/bringup-log.md` 2026-09-07). Two
 wrong guesses were made on that rig before anyone asked for the knob number.
 
@@ -199,7 +217,7 @@ Channel mapping, per rig:
 | Rig | Physical input | `use_channel` |
 |---|---|---|
 | Andy / M2 | input 2 (input 1 = his XLR mic) | **1** |
-| Parker / UCA202 | RCA left | **0** |
+| Parker / UFO202 | RCA left | **0** |
 
 A wrong `use_channel` produces near-silence, which is indistinguishable by symptom from a dead adapter, a closed squelch, or the §3.4 phase-cancellation trap. Rule it out first — it's the cheapest of the four to check. §5 Step 4b (level drops when you close squelch) is what proves you're on the right channel.
 
@@ -222,7 +240,7 @@ authorised modifying this radio: it is a spare, not in service. **That
 authorisation is specific to this radio** — the other station radios are not
 ours to touch.
 
-**Why bother when the UCA202 chain already works:** the tap point is
+**Why bother when the UFO202 chain already works:** the tap point is
 `FIL AUD OUT`, which is **before the volume control**. Two standing problems
 disappear with it.
 
@@ -323,8 +341,8 @@ Both are fine: `input_gain_db` covers the level, and the gate only measures
 3. Fit contacts to 10 and 11, reinsert the plug.
 4. **Meter before sound card.** Pin 11 to pin 10 should read ≈0 V DC, and show a
    small AC reading while a transmission is in progress. Do not connect the
-   UCA202 until that passes — DC on an input is how a sound card dies.
-5. Isolator, then UCA202 **RCA left** (`use_channel = 0`, unchanged).
+   UFO202 until that passes — DC on an input is how a sound card dies.
+5. Isolator, then UFO202 **RCA left** (`use_channel = 0`, unchanged).
 6. `scripts/level_meter.py`, then `scripts/calibrate.py`.
 7. New rig, new entry in `docs/bringup-log.md`, new thresholds. **No value from
    the handheld rig transfers** — different radio, different tap point, and a
@@ -368,7 +386,7 @@ Earphones into the adapter's 3.5 mm output, squelch open.
 ✅ Hiss in the earphones. ❌ Wrong adapter, wrong jack, or wrong pinout (§3.1).
 
 **Step 3 — Mac sees the interface.**
-`python scripts/audio_devices.py`. Expect the UCA202 or M2 listed with **2 input channels** at 48 kHz.
+`python scripts/audio_devices.py`. Expect the UFO202 or M2 listed with **2 input channels** at 48 kHz.
 ✅ Listed with 2 channels. ❌ Check USB cable, and System Settings → Sound → Input.
 
 **Step 4 — Signal is present, on the channel you think, and not cancelling.**
@@ -381,7 +399,7 @@ Calibrate the trim against the *loudest* signal you can produce — a nearby rad
 ✅ **4b:** level drops sharply when you close squelch. This is the step that proves `use_channel` matches the jack you plugged into; a level that doesn't move is a channel you aren't listening to.
 ❌ **Wrong `use_channel`** → near-silence regardless of gain (§3.7). Cheapest to check, so check it first.
 ❌ **Near-silence at high gain on the M2 rig → phase cancellation** (§3.4). Switch to a TS connection.
-❌ Near-silence on the UCA202 rig → check cable seating and radio volume. Cancellation is not the cause here.
+❌ Near-silence on the UFO202 rig → check cable seating and radio volume. Cancellation is not the cause here.
 
 **Step 5 — Mac records real radio audio.**
 Record 30 s squelch-open. Inspect the waveform in QuickTime or Audacity.

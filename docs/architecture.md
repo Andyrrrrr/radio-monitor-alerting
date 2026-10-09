@@ -11,7 +11,7 @@ These drive everything below. When a decision looks arbitrary, check here first.
 1. **Voice-only.** DSC and AIS are better signals but the target vessels don't carry the equipment. Voice on Ch 16 is load-bearing. DSC/AIS may be added as supplements; nothing may depend on them.
 2. **No RSSI.** A physical radio exposes audio, not signal strength. Segmentation is audio-energy VAD, not signal-strength gating.
 3. **Develop on Apple Silicon, deploy on x86 Linux.** Every platform-specific dependency sits behind an interface with at least two implementations.
-3a. **Two development rigs with different audio interfaces** (MOTU M2, Behringer UCA202). Device identity, gain, and thresholds are per-machine config, never hardcoded. Calibration values do not transfer between rigs.
+3a. **Two development rigs with different audio interfaces** (MOTU M2, Behringer UFO202). Device identity, gain, and thresholds are per-machine config, never hardcoded. Calibration values do not transfer between rigs.
 4. **Local-first.** The listening and alerting path must work with the network unplugged. Cloud services are optional upgrades, never requirements.
 5. **Files and live audio are the same thing.** The pipeline must run against recorded WAVs identically to live input. This enables offline development, deterministic tests, and tuning against a corpus.
 6. **The alert path never depends on the summarization path.** If the LLM is down, the alert still goes out with the raw transcript and the matched watchword.
@@ -260,7 +260,7 @@ Capture at the device's native rate (usually 48 kHz), resample to **16 kHz mono 
 
 **`use_channel` describes the capture device, not files.** `record_corpus.py` writes **mono** WAVs with the slice already applied, so `FileAudioSource` ignores `channel` for mono input (logging `file.mono_ignoring_channel`). Without that, a rig configured with `use_channel = 1` could not replay the corpus it recorded itself. An out-of-range channel on a genuinely multi-channel file still fails loudly.
 
-**Apply `input_gain_db` after capture, before segmentation.** This exists for rigs with no hardware input trim (Behringer UCA202). It can raise a too-quiet signal; it cannot undo clipping. Log a warning at startup if `input_gain_db` exceeds ~12 dB — that indicates an analog problem that should be fixed upstream.
+**Apply `input_gain_db` after capture, before segmentation.** This exists for rigs with no hardware input trim (Behringer UFO202). It can raise a too-quiet signal; it cannot undo clipping. Log a warning at startup if `input_gain_db` exceeds ~12 dB — that indicates an analog problem that should be fixed upstream.
 
 ### 5.2 Segmenter
 
