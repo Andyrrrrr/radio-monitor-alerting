@@ -13,6 +13,7 @@ failures) is returned for the alert delivery log, and one channel failing
 never stops the others.
 """
 
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 
 import structlog
@@ -34,6 +35,16 @@ class AlertRouter:
         # (incident_id, severity) → when we last alerted; the dedupe key
         # includes severity so escalation always gets through.
         self._sent: dict[tuple[str, Severity], datetime] = {}
+
+    @property
+    def channels(self) -> Mapping[str, AlertChannel]:
+        """Read-only view, for health notices that bypass incident routing.
+
+        Health traffic is not an incident (D12), so it must not go through
+        dispatch() — but it should reuse the configured, credentialed
+        channels rather than building a second notification path.
+        """
+        return self._channels
 
     def _channels_for(self, severity: Severity) -> list[AlertChannel]:
         names = {

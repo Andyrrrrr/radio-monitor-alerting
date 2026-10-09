@@ -96,8 +96,14 @@ Now it becomes usable by a person.
 
 The difference between a demo and something anyone should leave running.
 
-- [ ] `health/watchdog.py` — per-stage heartbeats, alert on any stage going quiet
-- [ ] **"No transmission in N hours" alert** (start at 6)
+- [~] `health/watchdog.py` — per-stage heartbeats, alert on any stage going quiet
+      *(2026-10-09: the CAPTURE heartbeat is built — `capture_watchdog` exits
+      non-zero when frames stop arriving, D24. Per-stage heartbeats for ASR,
+      detection and alerting are still unbuilt.)*
+- [x] **"No transmission in N hours" alert** (start at 6) — 2026-10-09, fires
+      once per silent spell and re-arms on traffic; health notices go out on
+      `[alerting].channels_health` at Pushover priority 0, never through the
+      incident path (D12)
 - [ ] Noise-floor drift monitoring against calibrated baseline
 - [ ] Daily end-to-end self-test including alert delivery
 - [ ] Disk space and queue-depth monitoring

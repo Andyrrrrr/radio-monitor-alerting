@@ -26,6 +26,12 @@ class MacOSAlertChannel:
         title = format_title(incident, is_update)
         # Notification banners truncate anyway; keep the essential line.
         body = format_body(incident, self._tz, None).splitlines()[0]
+        return await self._notify(title, body)
+
+    async def send_health(self, title: str, message: str) -> AlertResult:
+        return await self._notify(title, message.splitlines()[0])
+
+    async def _notify(self, title: str, body: str) -> AlertResult:
         script = (
             f"display notification {_applescript_str(body)} "
             f'with title {_applescript_str(title)} sound name "Sosumi"'

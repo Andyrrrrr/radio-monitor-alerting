@@ -13,8 +13,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from tests.test_alerting import RecordingChannel
 from tests.test_pipeline import FakeTranscriber
 from vhfwatch import pipeline
+from vhfwatch.alerting.router import AlertRouter
 from vhfwatch.config import Settings
 from vhfwatch.models import AudioFrame
 
@@ -89,3 +91,54 @@ def test_file_source_end_is_not_a_stall(tmp_path: Path) -> None:
     source = _Fileish()
     asyncio.run(pipeline.run(_cfg(tmp_path, 1), source, FakeTranscriber([])))
     assert source.closed
+
+
+def _silence_cfg(tmp_path: Path, hours: int) -> Settings:
+    cfg = Settings()
+    cfg.general.data_dir = tmp_path / "data"
+    cfg.health.capture_stall_s = 60  # not under test here
+    cfg.health.no_audio_alert_hours = hours
+    cfg.alerting.channels_health = ["console"]
+    return cfg
+
+
+def _run_with_health(
+    cfg: Settings, source: _LiveSource, monkeypatch: pytest.MonkeyPatch
+) -> RecordingChannel:
+    """Drive the ticker fast enough to observe, with a recording channel."""
+    monkeypatch.setattr(pipeline, "_TICK_INTERVAL_S", 0.05)
+    channel = RecordingChannel("console")
+    router = AlertRouter(cfg.alerting, {"console": channel})
+    asyncio.run(pipeline.run(cfg, source, FakeTranscriber([]), router))
+    return channel
+
+
+def test_no_transmission_alert_fires_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A radio powered off, tuned away, or with its antenna knocked loose
+    still delivers perfect frames of silence — invisible to the capture
+    watchdog, which is why this check exists separately (D24)."""
+    cfg = _silence_cfg(tmp_path, hours=0)  # 0 = alert on the first tick
+    source = _LiveSource(n=40, then_stall=False)
+    channel = _run_with_health(cfg, source, monkeypatch)
+
+    # Many ticks elapse, but a silent spell is ONE notice, not one per tick.
+    assert len(channel.health) == 1
+    title, message = channel.health[0]
+    assert "nothing heard" in title.lower()
+    # It must point at the radio, not the computer: the capture chain is
+    # provably alive if we got here.
+    assert "antenna" in message.lower()
+
+
+def test_no_alert_before_the_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ch 16 is quiet for hours at a time. Six hours of silence is normal;
+    firing early would train the operator to ignore the alert."""
+    cfg = _silence_cfg(tmp_path, hours=6)
+    source = _LiveSource(n=40, then_stall=False)
+    channel = _run_with_health(cfg, source, monkeypatch)
+
+    assert channel.health == []

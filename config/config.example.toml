@@ -128,6 +128,11 @@ channels_critical = ["console", "macos", "pushover"]
 channels_urgent   = ["console", "macos", "pushover"]
 channels_watch    = ["console"]
 channels_routine  = []
+# Operational notices: capture stalled, nothing heard in N hours, daily
+# self-test. Deliberately NOT the incident channels — these go out at
+# Pushover priority 0 and must not bypass Do Not Disturb. An operator woken
+# at 03:00 for a dead USB cable stops trusting the alerts that matter.
+channels_health   = ["console", "pushover"]
 # No-ack escalation is Pushover emergency priority (retry until acked below),
 # not a separate router mechanism.
 dedupe_window_s   = 300

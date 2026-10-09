@@ -26,5 +26,9 @@ class ConsoleAlertChannel:
         print(f"\n{banner}\n{title}\n{body}\n{banner}\n", file=sys.stderr)
         return AlertResult(channel=self.name, ok=True)
 
+    async def send_health(self, title: str, message: str) -> AlertResult:
+        print(f"\n[health] {title}\n{message}\n", file=sys.stderr)
+        return AlertResult(channel=self.name, ok=True)
+
     async def healthcheck(self) -> bool:
         return True

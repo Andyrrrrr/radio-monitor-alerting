@@ -55,6 +55,28 @@ class PushoverAlertChannel:
             return self._cfg.priority_urgent
         return 0
 
+    async def send_health(self, title: str, message: str) -> AlertResult:
+        """Operational notice, never an incident (D12).
+
+        Priority 0: a health notice must reach the phone, but it must not
+        bypass Do Not Disturb the way a mayday does — an operator who is
+        woken at 03:00 for a dead USB cable stops trusting the alerts that
+        matter.
+        """
+        if not (self._token and self._user):
+            return AlertResult(
+                channel=self.name, ok=False, detail="credentials not configured"
+            )
+        return await self._post(
+            {
+                "token": self._token,
+                "user": self._user,
+                "title": title[:_MAX_TITLE],
+                "message": message[:_MAX_MESSAGE],
+                "priority": 0,
+            }
+        )
+
     async def send(self, incident: Incident, is_update: bool) -> AlertResult:
         if not (self._token and self._user):
             return AlertResult(
@@ -77,6 +99,9 @@ class PushoverAlertChannel:
             data["retry"] = self._cfg.retry_s
             data["expire"] = self._cfg.expire_s
 
+        return await self._post(data)
+
+    async def _post(self, data: dict[str, str | int]) -> AlertResult:
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.post(_API_URL, data=data)

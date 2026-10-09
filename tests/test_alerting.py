@@ -52,11 +52,18 @@ class RecordingChannel:
         self._ok = ok
         self._crash = crash
         self.sent: list[tuple[str, bool]] = []
+        self.health: list[tuple[str, str]] = []
 
     async def send(self, incident: Incident, is_update: bool) -> AlertResult:
         if self._crash:
             raise RuntimeError("boom")
         self.sent.append((incident.id, is_update))
+        return AlertResult(channel=self.name, ok=self._ok)
+
+    async def send_health(self, title: str, message: str) -> AlertResult:
+        if self._crash:
+            raise RuntimeError("boom")
+        self.health.append((title, message))
         return AlertResult(channel=self.name, ok=self._ok)
 
     async def healthcheck(self) -> bool:

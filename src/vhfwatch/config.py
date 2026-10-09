@@ -183,6 +183,10 @@ class AlertingConfig(_Section):
     channels_urgent: list[str] = ["console", "macos", "pushover"]
     channels_watch: list[str] = ["console"]
     channels_routine: list[str] = []
+    # Operational notices (capture dead, nothing heard, daily self-test).
+    # NOT the incident channels: health goes out at Pushover priority 0 and
+    # must never bypass Do Not Disturb the way a mayday does.
+    channels_health: list[str] = ["console", "pushover"]
     # No-ack escalation is Pushover's emergency priority (retry until
     # acknowledged), not router logic — one mechanism, not two.
     dedupe_window_s: int = 300

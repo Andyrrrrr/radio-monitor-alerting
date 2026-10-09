@@ -19,6 +19,17 @@ class AlertChannel(Protocol):
 
     async def send(self, incident: Incident, is_update: bool) -> AlertResult: ...
 
+    async def send_health(self, title: str, message: str) -> AlertResult:
+        """Plain-text operational notice — "capture died", "nothing heard in
+        6 hours", the daily self-test.
+
+        Separate from `send` because a health notice is NOT an incident
+        (D12: one incident, one real emergency). Routing it through a
+        synthetic incident would put "VHF ALERT" on someone's phone for a
+        dead cable and leave a fake row in the evidence record.
+        """
+        ...
+
     async def healthcheck(self) -> bool: ...
 
 

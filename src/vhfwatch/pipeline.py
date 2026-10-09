@@ -308,6 +308,16 @@ async def run(
             from datetime import UTC, datetime
 
             drift_warned = False
+            # Fires ONCE per silent spell; re-arms when traffic returns, so a
+            # genuinely quiet night produces one notice, not one every tick.
+            silence_alerted = False
+            silence_limit_s = cfg.health.no_audio_alert_hours * 3600.0
+            # Count from startup, not from the last row in the database: a
+            # fresh install, or a box that was off overnight, must not fire
+            # the moment it boots.
+            started_at = time.monotonic()
+            last_tx_count = stats.transmissions
+            last_tx_at = started_at
             while True:
                 await asyncio.sleep(_TICK_INTERVAL_S)
                 for closed in correlator.tick(datetime.now(UTC)):
@@ -330,6 +340,47 @@ async def run(
                         calibrated_dbfs=calibrated,
                         hint="re-run scripts/calibrate.py or find what "
                         "changed in the audio chain",
+                    )
+
+                # Nothing heard in N hours. The capture watchdog (D24) proves
+                # frames are ARRIVING; this proves the radio is still hearing
+                # something. A radio powered off, tuned away, or with its
+                # antenna knocked loose delivers perfect frames of silence and
+                # is invisible to every other check we have.
+                if stats.transmissions != last_tx_count:
+                    last_tx_count = stats.transmissions
+                    last_tx_at = time.monotonic()
+                    silence_alerted = False
+                silent_for_s = time.monotonic() - last_tx_at
+                if not silence_alerted and silent_for_s > silence_limit_s:
+                    silence_alerted = True
+                    hours = silent_for_s / 3600.0
+                    logger.warning(
+                        "health.no_transmissions",
+                        silent_for_hours=round(hours, 1),
+                        limit_hours=cfg.health.no_audio_alert_hours,
+                    )
+                    db.insert_health_event(
+                        "ingest",
+                        "no_transmissions",
+                        {"silent_for_hours": round(hours, 1)},
+                    )
+                    floor = segmenter.noise_floor_db
+                    await _notify_health(
+                        router,
+                        cfg,
+                        title=f"vhf-watch: nothing heard in {hours:.0f}h",
+                        message=(
+                            f"No transmissions on ch {cfg.general.channel} for "
+                            f"{hours:.1f} hours at {cfg.general.site_name}.\n"
+                            f"Audio is still flowing (noise floor "
+                            f"{floor:.1f} dBFS), so the capture chain is alive "
+                            f"— check the radio: powered on, on channel, "
+                            f"antenna connected, squelch not jammed."
+                            if floor is not None
+                            else "Audio is flowing but no noise floor estimate "
+                            "yet — check the radio and the antenna."
+                        ),
                     )
 
         async def capture_watchdog() -> None:
@@ -389,6 +440,29 @@ async def run(
         ),
     )
     return stats
+
+
+async def _notify_health(
+    router: AlertRouter, cfg: Settings, *, title: str, message: str
+) -> None:
+    """Send an operational notice to the health channels.
+
+    Never raises: a failed health notice must not take down the pipeline it
+    is reporting on. Failures are logged, which is all we can honestly do —
+    if the network is down, nothing we send gets through anyway, and the
+    next notice will say so.
+    """
+    for name in cfg.alerting.channels_health:
+        channel = router.channels.get(name)
+        if channel is None:
+            continue
+        try:
+            result = await channel.send_health(title, message)
+        except Exception as e:  # noqa: BLE001 — see docstring
+            logger.warning("health.notify_failed", channel=name, error=str(e))
+            continue
+        if not result.ok:
+            logger.warning("health.notify_failed", channel=name, detail=result.detail)
 
 
 async def _archive_and_store(
