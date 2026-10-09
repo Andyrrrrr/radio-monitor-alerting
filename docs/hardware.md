@@ -227,11 +227,31 @@ Parker's radio has Bluetooth. It is not a viable audio path. Recorded here so it
 
 ---
 
-### 3.9 Parker's station rig — Motorola MCS 2000 (IN PROGRESS, not yet built)
+### 3.9 Parker's station rig — Motorola MCS 2000 (BUILT AND WORKING)
 
-**Status 2026-10-01: researched and specified, nothing wired yet.** Contacts on
-order. Nothing below has been verified against a meter — treat every pin number
-as a claim to check, not a fact, until the bring-up steps at the end pass.
+**Status 2026-10-09: built, calibrated, and running.** First live transmission
+transcribed exactly at **54.1 dB SNR** with the peak at −13.5 dBFS. Idle floor
+**−91.3 dBFS** band-limited — about 50 dB quieter than the handheld rig this
+replaces — thresholds **−83.5 / −87.5**. Everything below was verified with a
+meter and a sound card on that date; the pin numbering method in particular
+worked as written.
+
+> ⚠️ **The failure that cost most of the build: contacts that look seated and
+> are not.** Pushed in but not latched, a socket sits near its pin without
+> touching, couples capacitively, and passes a signal **~40 dB down** — invisible
+> in LINE mode and indistinguishable from a dead chain. **Push until it clicks,
+> then tug-test every wire.** Tell the two apart by the idle floor with the cable
+> connected: an unconnected input reads ≈−96 dBFS (converter noise), a connected
+> one is clearly higher.
+>
+> **PHONO mode is a free 40 dB detector.** When a tap looks dead, flip the
+> UFO202 to PHONO: the phono preamp drags a weak signal into view and tells you
+> "too weak" rather than "absent". Diagnostic only — RIAA EQ makes it useless
+> for real audio — **flip back to LINE.**
+>
+> **Do not trust a DMM on AC volts at a floating connector.** One did read "a big
+> jump" on a dead line here, from hand capacitance alone, and sent an hour of
+> debugging in the wrong direction.
 
 A **spare** Motorola MCS 2000 mobile at Parker's fire station, City of
 Bellingham asset 2168, remote control head, external Motorola speaker, powered

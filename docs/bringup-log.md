@@ -1128,3 +1128,89 @@ applies to a pre-volume tap. Still squelch-gated, so the segmenter is unchanged.
    handheld rig (D11).
 
 ---
+
+## 2026-10-09 — MCS 2000 tap BUILT and working: 54 dB SNR, 50 dB quieter than the rig it replaces
+
+**Who:** Parker · **Rig:** NEW — Motorola MCS 2000, fire station, pin 11 tap
+**Session:** build, debug and calibration. Pipeline live on Ch 16 from 15:53.
+
+### Result
+
+| | MCS 2000 (pin 11) | Handheld rig it replaces |
+|---|---|---|
+| Idle floor, band-limited 20 ms | **−91.3 dBFS** | −39.8 |
+| Loudest idle window | **−89.5** | −34.9 |
+| Idle spread (median→max) | **1.8 dB** | 5.5 dB |
+| Speech p50 / p99 | **−52.9 / −33.2** | −16.2 / — |
+| First live transmission | **54.1 dB SNR, peak −13.5** | 18–29 dB, peaks at 0 (clipping) |
+| Transcript | **"Radio check on channel 16. Radio check." — exact** | names mangled, 5 of 18 unreadable |
+
+Config: `noise_floor_dbfs = -91.3`, `close_threshold_db = -87.5`,
+`open_threshold_db = -83.5`, `site_name = "bellingham-station-mcs2000"`.
+Handheld values backed up outside the repo and preserved in earlier entries.
+
+**Volume knob is now irrelevant** — pin 11 is pre-volume. The taped-knob
+dependency and the clipping headroom problem are both retired.
+
+### Pin numbering: confirmed, not assumed
+
+Lettering the plug from the wire side (latch right, top row A–M, bottom N–Y)
+and metering for the factory jumpers gave **A–B** (adjacent) and **D–I** (five
+apart) plus the red wire in **O**. That maps to jumpers **1–2** and **4–9** and
+IGNITION on **15** — three independent landmarks, all consistent, orientation
+fixed. **J = pin 10, K = pin 11.** The method worked exactly as written in
+§3.9; keep it.
+
+### What cost the session: contacts that look seated and are not
+
+Hours went to a chain that read **dead in LINE mode** at every stage. The cause
+was mechanical: the new contacts were in the right holes but **not pushed in
+far enough to latch.** An unseated socket sits near its pin without touching,
+couples capacitively, and passes a signal roughly **40 dB down** — which in
+LINE mode is below the noise floor and looks exactly like nothing at all.
+Reseating them fixed it completely and the level came up as designed.
+
+**Both failure modes look identical through a sound card.** Distinguish them by
+the idle floor with the cable connected: an unconnected input reads ≈−96 dBFS
+(the converter's own noise), a connected one is noticeably higher.
+
+### Two diagnostic techniques worth keeping
+
+**1. PHONO mode as a 40 dB detector.** The UFO202's phono preamp adds ~35–40 dB
+plus RIAA EQ. Flipping to PHONO turned an invisible signal into one clipping at
+0 dBFS, which proved audio was present and reframed the problem from "no
+signal" to "signal far too weak". The EQ makes it useless for real audio —
+**diagnostic only, flip back to LINE** — but as a presence test it is excellent
+and needs no equipment.
+
+**2. Do NOT trust a DMM on AC volts at a floating connector.** Early on, a
+meter at the unplugged RCA showed "a big jump" on monitor, which sent us
+looking downstream for an hour. A high-impedance AC input picks up hand
+capacitance and mains hum and will happily read volts on a dead line. The
+honest test is a loaded one, or a sound card.
+
+### calibrate.py was contaminated by channel surfing
+
+A first run reported a **loudest idle window of −21.1 dBFS** against a −91.2
+median — the operator had passed through an active channel while tuning back to
+16. Thresholds derived from that tail would have been **−15.1 / −19.1**, above
+most speech, and the gate would never have opened. Re-run on a genuinely idle
+channel: tail −89.5, and the numbers in the table above.
+
+**Sanity check to apply every time:** if the loudest idle window sits more than
+~10 dB above the median, the run is contaminated. Here the final spread was
+1.8 dB.
+
+### Open items
+
+- **The ground-loop isolator is NOT in the chain.** It was removed during
+  debugging and never put back; the current numbers are direct. Decide
+  deliberately rather than by accident.
+- **Calibrated on BATTERY.** The laptop was unplugged. Mains added 8.9 dB of
+  hum on the old rig (D21); unknown here, and the tap is pre-volume and much
+  quieter, so it may not matter. Re-measure before trusting a mains session.
+- Contacts are seated in the HLN6412A housing, but the housing was in and out
+  repeatedly today. Tug-test the wires before trusting a long run.
+- Tier 2 and Pushover still unconfigured in this shell.
+
+---
