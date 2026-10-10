@@ -197,6 +197,11 @@ class AlertingConfig(_Section):
     # Every transmission, recording + transcript in one message. Off by
     # default: this is a monitoring aid, not the distress alert path, and it
     # sends audio off-box. Only audio-capable channels (telegram) qualify.
+    # Outbox (alerting/outbox.py): delivery that cannot slow down listening.
+    outbox_max_pending: int = 100  # beyond this the OLDEST routine item is dropped
+    retry_window_s: int = 1800  # a notification older than this is noise; give up
+    retry_initial_s: float = 5.0
+    retry_max_s: float = 120.0
     notify_every_transmission: bool = False
     channels_transmission: list[str] = ["telegram"]
     # No-ack escalation is Pushover's emergency priority (retry until

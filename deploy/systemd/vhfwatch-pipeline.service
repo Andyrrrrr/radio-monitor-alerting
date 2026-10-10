@@ -1,0 +1,54 @@
+# vhf-watch pipeline: listens on Ch 16, transcribes, detects, notifies.
+#
+# UNTESTED ON REAL HARDWARE as of 2026-10-09 — written on a Mac, to be proven on
+# the N100. Treat the first boot as a test of THIS FILE, not just the host.
+#
+# Install:   sudo cp deploy/systemd/vhfwatch-pipeline.service /etc/systemd/system/
+#            sudo systemctl daemon-reload && sudo systemctl enable --now vhfwatch-pipeline
+# Logs:      journalctl -u vhfwatch-pipeline -f
+
+[Unit]
+Description=vhf-watch pipeline (marine VHF Ch 16 monitor)
+Documentation=https://github.com/Andyrrrrr/radio-monitor-alerting/blob/main/deploy/README.md
+# Local-first (AGENTS.md constraint 5): listening and detection must work with
+# the network unplugged. The network is WANTED, for notifications, but never
+# REQUIRED — Requires= here would stop the radio listening whenever wifi drops.
+After=network-online.target sound.target
+Wants=network-online.target
+# Never stop retrying. systemd's default start limit (5 starts in 10 s) would
+# leave the service permanently dead after a USB interface that is unplugged
+# for a few minutes, which is the exact silent failure this project exists to
+# prevent. Deliberately in [Unit]: on recent systemd it is not valid in [Service].
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=vhfwatch
+Group=vhfwatch
+# The USB audio interface appears as an ALSA device owned by group "audio".
+SupplementaryGroups=audio
+WorkingDirectory=/opt/vhfwatch
+# Secrets live here, mode 640 root:vhfwatch, never in the repo or config.toml.
+EnvironmentFile=/etc/vhfwatch/vhfwatch.env
+ExecStart=/opt/vhfwatch/.venv/bin/python -u -m vhfwatch.pipeline --config /opt/vhfwatch/config/config.toml
+
+# D24: when capture stalls or a stage hangs, the pipeline EXITS NON-ZERO and this
+# is what brings it back. One mechanism covers a USB dropout, a power cut and an
+# unplugged cable, and unlike in-process recovery it cannot half-work.
+Restart=always
+RestartSec=10
+
+# The pipeline handles BOTH SIGINT and SIGTERM as a clean shutdown (it drains
+# queued notifications and closes the audio source), so systemd's default
+# SIGTERM is correct. It does not rely on the inherited signal disposition, which
+# for a background process started from a script is "ignore" for SIGINT.
+TimeoutStopSec=30
+
+# Modest hardening only. ProtectSystem=strict and friends are worth adding, but
+# a wrong ReadWritePaths on untested hardware would stop the audio device or the
+# model cache and look like a bug in the software. Add them once it runs.
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -137,6 +137,11 @@ class AlertResult:
     channel: str
     ok: bool
     detail: str | None = None
+    # True only when trying again could plausibly work: the network was down,
+    # the provider rate-limited us, or it had a 5xx. A rejected token or a
+    # malformed request will fail identically forever, and retrying it just
+    # hides a configuration error behind a delay.
+    retryable: bool = False
 
 
 @dataclass

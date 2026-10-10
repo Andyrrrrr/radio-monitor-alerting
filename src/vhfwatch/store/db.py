@@ -445,6 +445,26 @@ class Database:
                 ),
             )
 
+    def last_health_event_at(self, stage: str, kind: str) -> datetime | None:
+        """When a given health event last happened, or None if never.
+
+        Used to make "once per day" and "not during a crash loop" survive a
+        restart: a process that forgets what it already sent would send a
+        second daily check at every restart.
+        """
+        row = self._conn.execute(
+            "SELECT MAX(created_at) AS t FROM health_event WHERE stage = ? AND kind = ?",
+            (stage, kind),
+        ).fetchone()
+        return datetime.fromisoformat(row["t"]) if row and row["t"] else None
+
+    def count_transmissions_since(self, since: datetime) -> int:
+        row = self._conn.execute(
+            "SELECT COUNT(*) AS n FROM transmission WHERE started_at >= ?",
+            (_iso(since),),
+        ).fetchone()
+        return int(row["n"])
+
     def last_transmission_at(self) -> str | None:
         """Most recent transmission start time — the primary liveness signal
         for /health (total silence on Ch 16 means something is broken)."""

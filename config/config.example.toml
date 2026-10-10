@@ -142,6 +142,14 @@ channels_health   = ["console", "telegram"]
 # AND to the operator's ear. The recording is the evidence (AGENTS.md).
 # ⚠️ MARINE ONLY. Ch 16 is public broadcast traffic. Never point this at a rig
 # monitoring fire/EMS — addresses and patient details are plausible there.
+# Outbox (alerting/outbox.py). Notifications are queued and delivered by a
+# background worker with exponential backoff, so a wifi drop can never stall
+# transcription. FIFO, so a backlog arrives in the order it happened.
+outbox_max_pending = 100   # past this the OLDEST routine item is dropped, loudly
+retry_window_s     = 1800  # give up on a notification this old; the recording is
+                           # still archived, it is only not pushed
+retry_initial_s    = 5.0
+retry_max_s        = 120.0
 notify_every_transmission = true
 channels_transmission     = ["telegram"]
 
@@ -174,7 +182,9 @@ retention_days     = 90        # 0 = keep forever; set deliberately
 
 [health]
 no_audio_alert_hours = 6       # total silence on Ch 16 means something broke
-heartbeat_timeout_s  = 120
+heartbeat_timeout_s  = 120     # exit if ASR or detection sits inside ONE call this
+                               # long. A hung model leaves the process alive and
+                               # every other check green; restart is the fix (D24)
 capture_stall_s      = 30      # exit if no audio FRAMES arrive for this long.
                                # Frames keep coming while the channel is quiet
                                # (silence is quiet frames, not no frames), so

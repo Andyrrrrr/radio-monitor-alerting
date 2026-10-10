@@ -111,13 +111,20 @@ class PushoverAlertChannel:
                 )
             detail = f"HTTP {response.status_code}: {response.text[:200]}"
             logger.warning("alert.pushover_failed", detail=detail)
-            return AlertResult(channel=self.name, ok=False, detail=detail)
+            return AlertResult(
+                channel=self.name,
+                ok=False,
+                detail=detail,
+                retryable=response.status_code == 429 or response.status_code >= 500,
+            )
         except httpx.HTTPError as e:
             # Network down is an expected condition, not a crash: the
             # console/macos channels still fired, and the failure is logged
             # to the alert table for the record.
             logger.warning("alert.pushover_failed", detail=str(e))
-            return AlertResult(channel=self.name, ok=False, detail=str(e))
+            return AlertResult(
+                channel=self.name, ok=False, detail=str(e), retryable=True
+            )
 
     async def healthcheck(self) -> bool:
         return bool(self._token and self._user)

@@ -69,12 +69,14 @@ vhf-watch/
 │   │   ├── console.py           # dev
 │   │   ├── macos.py             # dev, osascript notifications
 │   │   ├── pushover.py
+│   │   ├── telegram.py          # recording + transcript in one message (D26)
+│   │   ├── outbox.py            # non-blocking delivery, retry, gap report (D28)
 │   │   └── router.py            # severity → channels, escalation
 │   ├── store/
 │   │   ├── schema.sql
 │   │   └── db.py
 │   ├── health/
-│   │   └── watchdog.py
+│   │   └── watchdog.py          # stall exceptions, StageTracker, daily check (D24, D28)
 │   └── web/
 │       ├── app.py               # FastAPI
 │       └── templates/
@@ -453,13 +455,21 @@ SQLite, WAL mode. Schema in `store/schema.sql`, tables per the report's data mod
 
 ### 5.9 Watchdog
 
-Silent failure is the worst outcome. Minimum:
+Silent failure is the worst outcome. The rule, from D24: **when something is stuck, exit non-zero and let the supervisor restart us.** In-process recovery is more code and more ways to half-work, and half-working looks healthy.
 
-- Heartbeat from every stage; alert if any goes quiet.
-- **Alert if no transmission has been received in N hours** (start with 6, tune to the site). On Ch 16 in an active harbor, total silence means something is broken — a cable, a battery, a knob.
-- **Noise-floor drift monitoring.** A sudden drop means the audio chain broke; a rise means a level or interference change. Compare against the calibrated value from `scripts/calibrate.py`.
-- Daily end-to-end self-test: push a synthetic detection through the full pipeline including alert delivery, and report the result.
-- Disk space and queue-depth monitoring.
+Built (2026-10-09):
+
+- **Capture heartbeat** — frames must keep *arriving*; none for `capture_stall_s` raises `CaptureStalled`. Frames, not audio level: a quiet channel is quiet frames.
+- **Stage stall** — ASR or detection inside one call for `heartbeat_timeout_s` raises `StageStalled` (`StageTracker`). "Busy too long", not "no output recently", because healthy stages are idle for hours.
+- **No transmission in N hours** (`no_audio_alert_hours`, default 6) — catches what the above cannot: a radio powered off, tuned away, or with its antenna knocked loose delivers perfect frames of silence. Fires once per silent spell, re-arms on traffic.
+- **Daily self-test** — one "alive" message per local day at `self_test_hour`, sent through the real delivery path, so its arrival also proves notifications work. Last-sent time is read from `health_event`, not memory.
+- **"Started" notice**, throttled to once per 10 minutes so a crash loop cannot bury it.
+- **Disk-space check** (`min_free_disk_gb`).
+- **Noise-floor drift** against the calibrated value, once per run.
+
+All health notices go through the **outbox** (`alerting/outbox.py`, D28): queued, retried with backoff, FIFO, bounded, urgent items first, and a recovery notice reports any gap. A dead network can never stall transcription. Health notices are *not* incidents (D12) — `AlertChannel.send_health()`, `[alerting].channels_health`.
+
+Not built: `WatchdogSec=`/`sd_notify`; per-stage queue-depth alerts (drops are counted and logged); recording retention (`retention_days` is configured but nothing deletes anything).
 
 ### 5.10 Web app
 

@@ -1286,17 +1286,27 @@ loses at most the last transaction and cannot corrupt the file. The requirement
 is only that it comes back by itself — hence D24 (crash, let `systemd
 Restart=always` restart) rather than in-process recovery. No UPS.
 
-### Lesson: a stale process survived a "stop"
+### Lesson: a stale process survived a "stop" — and the first diagnosis was wrong
 
-Stopping the pipeline with `kill -INT` hit a wrapper shell, not the Python
-process. The old instance kept running **alongside** the new one, both capturing
-the same device and writing the same database, and the stale one would have
-sent a "nothing heard" notice every tick (its threshold had been forced to 0 for
-a Pushover test). Caught by listing processes, not by any alert.
+Stopping the pipeline with `kill -INT` did nothing, and the old instance kept
+running **alongside** the new one, both capturing the same device and writing the
+same database. The stale one had its silence threshold forced to 0 and would have
+notified every tick. Caught by listing processes, not by any alert.
 
-**After every restart: `pgrep -fl "vhfwatch.pipeline"` and confirm exactly one.**
-Under systemd this class of mistake disappears — one unit owns the process
-group — which is a point in favour of the N100 plan.
+**Corrected 2026-10-09 (same evening).** This entry first said the signal "hit a
+wrapper shell, not the Python process". That was a guess and it was wrong. The
+real cause, tested: a Python process started with `cmd &` or `nohup cmd &` from a
+**non-interactive shell inherits SIGINT as IGNORED** (`signal.getsignal(SIGINT)`
+returns `1`), so Python never installs its KeyboardInterrupt handler and
+`kill -INT` does nothing at all. SIGTERM did work, but killed the process with no
+cleanup (a leaked-semaphore warning gave it away).
+
+**Fixed in code, not by habit:** `pipeline.run_until_signalled` now handles both
+SIGINT and SIGTERM itself, so shutdown is clean however the process was launched,
+and `systemctl stop` (SIGTERM) drains queued notifications rather than killing
+mid-write. A regression test starts the pipeline with SIGINT ignored and checks
+both signals. **After any restart: `pgrep -fl "vhfwatch.pipeline"` and confirm
+exactly one.**
 
 ### Verified end to end
 

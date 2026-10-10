@@ -1,0 +1,32 @@
+# vhf-watch web app: the incident record pages. OPTIONAL.
+#
+# Telegram notifications (D26) carry the recording and transcript themselves and
+# need no web app at all. Run this only if you want the browsable incident
+# records, reached over Tailscale or on the LAN — never exposed to the internet:
+# these are recordings of real people.
+#
+# A SEPARATE unit from the pipeline on purpose (docs/decisions.md D8): a hung web
+# request must never be able to stop detection.
+#
+# UNTESTED ON REAL HARDWARE as of 2026-10-09.
+
+[Unit]
+Description=vhf-watch web app (incident records)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=vhfwatch
+Group=vhfwatch
+WorkingDirectory=/opt/vhfwatch
+EnvironmentFile=/etc/vhfwatch/vhfwatch.env
+ExecStart=/opt/vhfwatch/.venv/bin/python -u -m vhfwatch.web --config /opt/vhfwatch/config/config.toml
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

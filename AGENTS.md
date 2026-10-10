@@ -19,6 +19,7 @@ Deep reference lives in `docs/`. This file is the map; the docs are the territor
 | [`docs/bringup-log.md`](docs/bringup-log.md) | Debugging "it worked yesterday" — per-rig settings and dated verification results |
 | [`docs/status.json`](docs/status.json) | Orienting at the start of a session — what's built, what's not, what's broken |
 | [`docs/plans/`](docs/plans/) | Working on a feature big enough to need a written plan first |
+| [`deploy/README.md`](deploy/README.md) | Installing on the station host — systemd units, the install runbook, and the recovery tests to run before leaving it unattended |
 
 ## Framing that shapes the code
 

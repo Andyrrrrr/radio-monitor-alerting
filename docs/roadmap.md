@@ -96,7 +96,7 @@ Now it becomes usable by a person.
 
 The difference between a demo and something anyone should leave running.
 
-- [~] `health/watchdog.py` — per-stage heartbeats, alert on any stage going quiet
+- [x] `health/watchdog.py` — capture heartbeat and stage-stall detection (D24, D28); both exit non-zero so the supervisor restarts
       *(2026-10-09: the CAPTURE heartbeat is built — `capture_watchdog` exits
       non-zero when frames stop arriving, D24. Per-stage heartbeats for ASR,
       detection and alerting are still unbuilt.)*
@@ -105,12 +105,12 @@ The difference between a demo and something anyone should leave running.
       `[alerting].channels_health` at Pushover priority 0, never through the
       incident path (D12)
 - [ ] Noise-floor drift monitoring against calibrated baseline
-- [ ] Daily end-to-end self-test including alert delivery
-- [ ] Disk space and queue-depth monitoring
+- [x] Daily end-to-end self-test including alert delivery — 2026-10-09; sent through the real outbox, so its arrival proves delivery works
+- [~] Disk space and queue-depth monitoring — disk-low alert built; queue overflow is counted and logged but does not alert
 - [ ] `GET /health` dashboard: last transmission, noise floor, queue depths, ASR latency, per-stage heartbeats
-- [ ] `systemd` units for x86 Linux — pipeline and web as separate units
+- [~] `systemd` units for x86 Linux — written in `deploy/systemd/`, **untested on real hardware**
 - [ ] **Verify on x86 Linux with `faster-whisper`.** Do this before you've built much more; portability rot is easier to prevent than to fix.
-- [ ] Runbook: restart procedures, recalibration, common failure modes
+- [~] Runbook: `deploy/README.md` — written, not yet run on the target; ends with the recovery tests that are the real acceptance
 
 **Exit:** the system runs unattended for a week. Unplug the audio cable and it tells you within the configured window. It runs on x86 Linux, not just the Mac.
 

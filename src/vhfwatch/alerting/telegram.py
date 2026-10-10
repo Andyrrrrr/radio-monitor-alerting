@@ -82,13 +82,13 @@ class TelegramAlertChannel:
 
     # -- the reason this channel exists ----------------------------------
 
-    async def send_audio(self, audio: Path, caption: str) -> AlertResult:
+    async def send_audio(self, audio: Path | None, caption: str) -> AlertResult:
         """One message: the recording, with the transcript as its caption.
 
         Falls back to text if the file is missing — a transcript with no
         audio still beats no notification at all.
         """
-        if not audio.exists():
+        if audio is None or not audio.exists():
             logger.warning("alert.telegram_audio_missing", path=str(audio))
             return await self._call(
                 "sendMessage", data={"text": caption[:_MAX_MESSAGE]}
@@ -124,12 +124,19 @@ class TelegramAlertChannel:
             # Network down is expected, not exceptional: the station runs on
             # wifi. Log it, record the failure, let the pipeline continue.
             logger.warning("alert.telegram_failed", method=method, detail=str(e))
-            return AlertResult(channel=self.name, ok=False, detail=str(e))
+            return AlertResult(
+                channel=self.name, ok=False, detail=str(e), retryable=True
+            )
         if response.status_code == 200:
             return AlertResult(channel=self.name, ok=True, detail=response.text[:200])
         detail = f"HTTP {response.status_code}: {response.text[:200]}"
         logger.warning("alert.telegram_failed", method=method, detail=detail)
-        return AlertResult(channel=self.name, ok=False, detail=detail)
+        # 429 (rate limit) and 5xx are worth retrying; 400/401/403/404 are a
+        # bad token, bad chat id or malformed request and never will be.
+        retryable = response.status_code == 429 or response.status_code >= 500
+        return AlertResult(
+            channel=self.name, ok=False, detail=detail, retryable=retryable
+        )
 
     async def healthcheck(self) -> bool:
         return bool(self._token and self._chat)

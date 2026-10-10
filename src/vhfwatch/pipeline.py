@@ -30,9 +30,13 @@ Usage:
 
 import argparse
 import asyncio
+import shutil
+import signal
 import time
 from collections import deque
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from functools import partial
 from pathlib import Path
 from typing import TypeVar
 from zoneinfo import ZoneInfo
@@ -40,6 +44,7 @@ from zoneinfo import ZoneInfo
 import structlog
 
 from vhfwatch.alerting import AlertRouter, create_channels
+from vhfwatch.alerting.outbox import OutageSummary, Outbox
 from vhfwatch.asr import Transcriber, create_transcriber
 from vhfwatch.audio.encode import archive_audio, playback_path_for
 from vhfwatch.audio.resample import ResamplingAudioSource
@@ -59,6 +64,16 @@ from vhfwatch.detect import (
     gate_transmission,
     unrunnable_checks,
 )
+from vhfwatch.health.watchdog import (
+    CaptureStalled,
+    PipelineStalled,
+    SelfTestFacts,
+    StageStalled,
+    StageTracker,
+    format_self_test,
+    self_test_due,
+    should_announce_start,
+)
 from vhfwatch.incidents.correlator import DetectionContext, IncidentCorrelator
 from vhfwatch.log import configure_logging
 from vhfwatch.models import Incident, Severity, Transcript, Transmission
@@ -66,14 +81,6 @@ from vhfwatch.store import Database
 from vhfwatch.web.tokens import mint_share_link
 
 logger = structlog.get_logger(__name__)
-
-
-class CaptureStalled(RuntimeError):
-    """No audio frames arrived within `[health].capture_stall_s`.
-
-    Raised so the process exits non-zero and the supervisor restarts it.
-    Live sources only: a file source legitimately ends.
-    """
 
 
 # Backpressure bound per stage (docs/architecture.md §3). A genuine
@@ -84,6 +91,12 @@ _QUEUE_MAX = 32
 # How often the live pipeline checks for quiet incidents to close. Coarse
 # on purpose — the quiet period itself is minutes.
 _TICK_INTERVAL_S = 15.0
+# How long shutdown waits for queued notifications. Bounded: a dead network
+# must never hold up an exit.
+_DRAIN_S = 10.0
+# A restart inside this window does not send another "started" notice, so a
+# crash loop cannot bury the one that matters.
+_START_NOTICE_QUIET = timedelta(minutes=10)
 
 
 @dataclass
@@ -164,6 +177,35 @@ async def run(
             )
             router = AlertRouter(cfg.alerting, channels)
 
+        def _announce_recovery(summary: OutageSummary) -> None:
+            tz = ZoneInfo(cfg.general.local_timezone)
+            down = summary.ended_at - summary.started_at
+            _notify_health(
+                outbox,
+                router,
+                cfg,
+                title="vhf-watch: notifications recovered",
+                message=(
+                    f"Delivery was failing from "
+                    f"{summary.started_at.astimezone(tz):%H:%M:%S} to "
+                    f"{summary.ended_at.astimezone(tz):%H:%M:%S} "
+                    f"({int(down.total_seconds() // 60)} min). "
+                    f"{summary.delivered_late} arrived late, "
+                    f"{summary.abandoned} gave up. Recordings are all archived; "
+                    f"listening was never interrupted."
+                ),
+            )
+
+        outbox = Outbox(
+            max_pending=cfg.alerting.outbox_max_pending,
+            retry_window_s=cfg.alerting.retry_window_s,
+            retry_initial_s=cfg.alerting.retry_initial_s,
+            retry_max_s=cfg.alerting.retry_max_s,
+            on_recovered=_announce_recovery,
+        )
+        tracker = StageTracker()
+        process_started = time.monotonic()
+
         correlator = IncidentCorrelator(cfg.correlator)
         correlator.adopt(
             [_incident_from_row(row, db) for row in db.list_open_incidents()]
@@ -221,7 +263,8 @@ async def run(
                         transmission_id=tx.id,
                         reason=reason,
                     )
-                    await _notify_transmission(
+                    _notify_transmission(
+                        outbox,
                         router,
                         cfg,
                         tx,
@@ -229,7 +272,8 @@ async def run(
                         rejected=f"not transcribed: {reason}",
                     )
                     continue
-                transcript = await transcriber.transcribe(tx)
+                with tracker.busy("asr"):
+                    transcript = await transcriber.transcribe(tx)
                 db.insert_transcript(transcript)
                 stats.transcripts += 1
                 missing = unrunnable_checks(transcript)
@@ -254,12 +298,12 @@ async def run(
                         reason=reject,
                         text=transcript.text[:120],
                     )
-                    await _notify_transmission(
-                        router, cfg, tx, text=transcript.text, rejected=reject
+                    _notify_transmission(
+                        outbox, router, cfg, tx, text=transcript.text, rejected=reject
                     )
                     continue
-                await _notify_transmission(
-                    router, cfg, tx, text=transcript.text, rejected=None
+                _notify_transmission(
+                    outbox, router, cfg, tx, text=transcript.text, rejected=None
                 )
                 _drop_oldest_put(detect_queue, transcript, "detect", stats)
 
@@ -270,7 +314,8 @@ async def run(
                 transcript = await detect_queue.get()
                 if transcript is None:
                     return
-                detection = await detector.detect(transcript, list(context))
+                with tracker.busy("detect"):
+                    detection = await detector.detect(transcript, list(context))
                 context.append(transcript.text)
                 if detection is None:
                     continue
@@ -310,6 +355,22 @@ async def run(
                     )
                     if ar.ok:
                         stats.alerts_sent += 1
+                    elif ar.retryable:
+                        # The first attempt already happened, in line. A retry
+                        # must NOT block detection, so it goes to the outbox,
+                        # at the front of the queue: a mayday never waits
+                        # behind a routine push.
+                        failed_channel = router.channels.get(ar.channel)
+                        if failed_channel is not None:
+                            outbox.submit(
+                                f"alert:{result.incident.id}:{ar.channel}",
+                                partial(
+                                    failed_channel.send,
+                                    result.incident,
+                                    not result.is_new,
+                                ),
+                                urgent=True,
+                            )
                 if alert_results:
                     db.update_incident(result.incident)  # persist alerted_at
 
@@ -319,8 +380,7 @@ async def run(
         async def tick_quiet_incidents() -> None:
             # Wall-clock tick for live operation: with no new detections,
             # quiet incidents must still close. Cancelled at shutdown.
-            from datetime import UTC, datetime
-
+            tz = ZoneInfo(cfg.general.local_timezone)
             drift_warned = False
             # Fires ONCE per silent spell; re-arms when traffic returns, so a
             # genuinely quiet night produces one notice, not one every tick.
@@ -332,10 +392,73 @@ async def run(
             started_at = time.monotonic()
             last_tx_count = stats.transmissions
             last_tx_at = started_at
+            # "Once per day" must survive a restart, so the last run comes
+            # from the database, not from memory.
+            last_self = db.last_health_event_at("pipeline", "self_test")
+            last_self_date = last_self.astimezone(tz).date() if last_self else None
+            disk_alerted = False
+            is_live = source.name == "live"
             while True:
                 await asyncio.sleep(_TICK_INTERVAL_S)
                 for closed in correlator.tick(datetime.now(UTC)):
                     db.update_incident(closed)
+
+                # Disk: recordings accumulate forever (90-day retention), and a
+                # full disk fails silently in the one place that matters.
+                free_gb = shutil.disk_usage(data_dir).free / 1e9
+                if free_gb < cfg.health.min_free_disk_gb and not disk_alerted:
+                    disk_alerted = True
+                    logger.warning("health.disk_low", free_gb=round(free_gb, 1))
+                    db.insert_health_event(
+                        "storage", "disk_low", {"free_gb": round(free_gb, 1)}
+                    )
+                    _notify_health(
+                        outbox,
+                        router,
+                        cfg,
+                        title="vhf-watch: disk space low",
+                        message=f"{free_gb:.1f} GB free at {cfg.general.site_name} "
+                        f"(limit {cfg.health.min_free_disk_gb} GB). Recording will "
+                        f"fail when it fills — free some space.",
+                    )
+                elif free_gb >= cfg.health.min_free_disk_gb + 1:
+                    disk_alerted = False
+
+                # Daily check: on a channel this quiet, "no news" and "dead"
+                # look identical, so being alive is reported as a fact.
+                now_local = datetime.now(UTC).astimezone(tz)
+                if is_live and self_test_due(
+                    now_local, last_self_date, cfg.health.self_test_hour
+                ):
+                    last_self_date = now_local.date()
+                    last_tx = db.last_transmission_at()
+                    title, message = format_self_test(
+                        SelfTestFacts(
+                            site=cfg.general.site_name,
+                            channel=cfg.general.channel,
+                            uptime_s=time.monotonic() - process_started,
+                            transmissions_24h=db.count_transmissions_since(
+                                datetime.now(UTC) - timedelta(hours=24)
+                            ),
+                            last_transmission_local=(
+                                datetime.fromisoformat(last_tx)
+                                .astimezone(tz)
+                                .strftime("%b %d %H:%M")
+                                if last_tx
+                                else None
+                            ),
+                            noise_floor_dbfs=segmenter.noise_floor_db,
+                            calibrated_floor_dbfs=cfg.audio.calibration.noise_floor_dbfs,
+                            disk_free_gb=free_gb,
+                            asr_engine=transcriber.name,
+                            outbox_delivered=outbox.stats.delivered,
+                            outbox_abandoned=outbox.stats.abandoned,
+                            outbox_dropped=outbox.stats.dropped,
+                            queue_drops=stats.queue_drops,
+                        )
+                    )
+                    db.insert_health_event("pipeline", "self_test", None)
+                    _notify_health(outbox, router, cfg, title=title, message=message)
                 # Noise-floor drift vs the calibrated value: a drop means
                 # the audio chain broke, a rise means a level or
                 # interference change — either way the calibrated
@@ -380,7 +503,8 @@ async def run(
                         {"silent_for_hours": round(hours, 1)},
                     )
                     floor = segmenter.noise_floor_db
-                    await _notify_health(
+                    _notify_health(
+                        outbox,
                         router,
                         cfg,
                         title=f"vhf-watch: nothing heard in {hours:.0f}h",
@@ -397,20 +521,39 @@ async def run(
                         ),
                     )
 
-        async def capture_watchdog() -> None:
-            """Assert frames are still ARRIVING, not merely that we are alive.
+        async def watchdog() -> None:
+            """Assert the pipeline is making progress, not merely alive.
 
-            The noise-floor drift warning is not a substitute: it fires only
-            when the estimate MOVES, and a dead stream moves nothing.
+            Two distinct failures, both fatal by design (D24):
+            - capture: frames stopped ARRIVING (a dead USB interface);
+            - stage: ASR or detection has been inside one call too long.
+            The noise-floor drift warning is no substitute for either: it
+            fires only when the estimate MOVES, and a dead stream moves nothing.
             """
             stall_s = float(cfg.health.capture_stall_s)
-            interval = min(stall_s / 2.0, _TICK_INTERVAL_S)
+            stage_limit_s = float(cfg.health.heartbeat_timeout_s)
+            interval = min(stall_s / 2.0, stage_limit_s / 2.0, _TICK_INTERVAL_S)
             while True:
                 try:
                     await asyncio.wait_for(ingest_done.wait(), timeout=interval)
                     return  # the source ended deliberately; nothing to watch
                 except TimeoutError:
                     pass
+                for stage, busy_for in tracker.stalled(stage_limit_s):
+                    logger.error(
+                        "pipeline.stage_stalled",
+                        stage=stage,
+                        busy_for_s=round(busy_for, 1),
+                        limit_s=stage_limit_s,
+                        hint="a stage is stuck inside one call — exiting so "
+                        "the supervisor restarts us",
+                    )
+                    db.insert_health_event(
+                        stage, "stage_stalled", {"busy_for_s": round(busy_for, 1)}
+                    )
+                    raise StageStalled(
+                        f"{stage} stuck for {busy_for:.0f}s (limit {stage_limit_s:.0f}s)"
+                    )
                 silent_for = time.monotonic() - stats.last_frame_at
                 if silent_for > stall_s:
                     logger.error(
@@ -420,20 +563,58 @@ async def run(
                         hint="no frames from the audio source — exiting so the "
                         "supervisor restarts us (docs/hardware.md §3.9)",
                     )
+                    db.insert_health_event(
+                        "capture", "stalled", {"silent_for_s": round(silent_for, 1)}
+                    )
                     raise CaptureStalled(
                         f"no audio frames for {silent_for:.0f}s (limit {stall_s:.0f}s)"
                     )
 
+        def announce_start() -> None:
+            """Tell the operator the process (re)started — after a power cut
+            this is the only sign that it came back by itself."""
+            if source.name != "live":
+                return
+            now = datetime.now(UTC)
+            previous = db.last_health_event_at("pipeline", "started")
+            capture_stall = db.last_health_event_at("capture", "stalled")
+            stage_stall = db.last_health_event_at("asr", "stage_stalled")
+            db.insert_health_event("pipeline", "started", None)
+            if not should_announce_start(previous, now, _START_NOTICE_QUIET):
+                logger.info("health.start_notice_suppressed", reason="restart loop")
+                return
+            cause = ""
+            for label, when in (
+                ("a capture stall", capture_stall),
+                ("an ASR stall", stage_stall),
+            ):
+                if when and now - when < timedelta(minutes=15):
+                    cause = f" Previous run ended after {label}."
+            _notify_health(
+                outbox,
+                router,
+                cfg,
+                title="vhf-watch: started",
+                message=f"Monitoring ch {cfg.general.channel} at "
+                f"{cfg.general.site_name} ({transcriber.name}).{cause}",
+            )
+
+        announce_start()
+        outbox_task = asyncio.create_task(outbox.run())
         ticker = asyncio.create_task(tick_quiet_incidents())
         try:
             async with asyncio.TaskGroup() as tg:
                 tg.create_task(ingest())
                 if source.name == "live":
-                    tg.create_task(capture_watchdog())
+                    tg.create_task(watchdog())
                 tg.create_task(transcribe())
                 tg.create_task(detect())
         finally:
             ticker.cancel()
+            # Let queued notifications go out (bounded) before stopping the
+            # worker, so a finished replay does not lose its last messages.
+            await outbox.drain(_DRAIN_S)
+            outbox_task.cancel()
             await source.close()
 
     logger.info(
@@ -456,30 +637,27 @@ async def run(
     return stats
 
 
-async def _notify_health(
-    router: AlertRouter, cfg: Settings, *, title: str, message: str
+def _notify_health(
+    outbox: Outbox, router: AlertRouter, cfg: Settings, *, title: str, message: str
 ) -> None:
-    """Send an operational notice to the health channels.
+    """Queue an operational notice for the health channels.
 
-    Never raises: a failed health notice must not take down the pipeline it
-    is reporting on. Failures are logged, which is all we can honestly do —
-    if the network is down, nothing we send gets through anyway, and the
-    next notice will say so.
+    Non-blocking by design: this is called from inside the pipeline, and a
+    dead network must never be able to stall the thing it is reporting on.
+    The outbox retries; the pipeline moves on.
     """
     for name in cfg.alerting.channels_health:
         channel = router.channels.get(name)
         if channel is None:
             continue
-        try:
-            result = await channel.send_health(title, message)
-        except Exception as e:  # noqa: BLE001 — see docstring
-            logger.warning("health.notify_failed", channel=name, error=str(e))
-            continue
-        if not result.ok:
-            logger.warning("health.notify_failed", channel=name, detail=result.detail)
+        outbox.submit(
+            f"health:{name}:{title}",
+            partial(channel.send_health, title, message),
+        )
 
 
-async def _notify_transmission(
+def _notify_transmission(
+    outbox: Outbox,
     router: AlertRouter,
     cfg: Settings,
     tx: Transmission,
@@ -487,7 +665,7 @@ async def _notify_transmission(
     text: str | None,
     rejected: str | None,
 ) -> None:
-    """Push one transmission — recording plus transcript — to the phone.
+    """Queue one transmission — recording plus transcript — for the phone.
 
     Why audio travels with the text: on this site the transcripts are often
     wrong in the places that matter (vessel names, positions, channel
@@ -499,6 +677,10 @@ async def _notify_transmission(
     pushed a hallucination (`! ! ! ! ! ! !`) to the operator's phone with no
     indication the pipeline had thrown it out — exactly the kind of quiet
     dishonesty the record is supposed to prevent.
+
+    Queued, never awaited: during a wifi outage an inline upload would block
+    the transcription stage for its full timeout, and real traffic would sit
+    unprocessed behind a dead network.
     """
     if not cfg.alerting.notify_every_transmission:
         return
@@ -522,17 +704,10 @@ async def _notify_transmission(
         if send_audio is None:
             logger.warning("alert.channel_cannot_send_audio", channel=name)
             continue
-        try:
-            result = await send_audio(audio, caption)
-        except Exception as e:  # noqa: BLE001 — never take the pipeline down
-            logger.warning(
-                "alert.transmission_notify_failed", channel=name, error=str(e)
-            )
-            continue
-        if not result.ok:
-            logger.warning(
-                "alert.transmission_notify_failed", channel=name, detail=result.detail
-            )
+        outbox.submit(
+            f"tx:{name}:{tx.id[:8]}",
+            partial(send_audio, audio, caption),
+        )
 
 
 async def _archive_and_store(
@@ -608,6 +783,35 @@ def build_source(cfg: Settings, kind: str, path: Path | None) -> AudioSource:
     raise SystemExit(f"unknown source kind: {kind}")
 
 
+async def run_until_signalled(
+    cfg: Settings,
+    source: AudioSource,
+    transcriber: Transcriber | None = None,
+    router: AlertRouter | None = None,
+) -> PipelineStats | None:
+    """Run the pipeline, shutting down cleanly on SIGINT or SIGTERM.
+
+    Why this exists rather than relying on KeyboardInterrupt: a Python process
+    started in the background from a non-interactive shell (`cmd &`, `nohup`)
+    inherits SIGINT as *ignored*, so it never raises KeyboardInterrupt and
+    `kill -INT` does nothing — which left a stale pipeline running beside a new
+    one on 2026-10-09. And `systemctl stop` sends SIGTERM, whose default action
+    kills the process mid-write with no cleanup. Handling both explicitly makes
+    shutdown behave the same however the process was launched, and lets the
+    finally blocks run (drain queued notifications, close the audio source).
+    """
+    loop = asyncio.get_running_loop()
+    main_task = asyncio.current_task()
+    assert main_task is not None
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, main_task.cancel)
+    try:
+        return await run(cfg, source, transcriber, router)
+    except asyncio.CancelledError:
+        logger.info("pipeline.stopped", reason="signal")
+        return None
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="vhfwatch.pipeline",
@@ -631,13 +835,13 @@ def main(argv: list[str] | None = None) -> None:
     kind = args.source or cfg.audio.source
     source = build_source(cfg, kind, args.path)
     try:
-        asyncio.run(run(cfg, source))
+        asyncio.run(run_until_signalled(cfg, source))
     except KeyboardInterrupt:
         logger.info("pipeline.stopped", reason="keyboard interrupt")
     except BaseExceptionGroup as eg:
         # TaskGroup wraps; subgroup() also handles nesting. Anything that
         # isn't a stall propagates untouched — this is not a catch-all.
-        if eg.subgroup(CaptureStalled) is None:
+        if eg.subgroup(PipelineStalled) is None:
             raise
         # Non-zero exit is the point: systemd Restart=always brings us back
         # with a fresh audio stream. Do not try to recover in-process.

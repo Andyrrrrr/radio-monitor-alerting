@@ -25,7 +25,7 @@ class AudioCapableChannel(Protocol):
 
     name: str
 
-    async def send_audio(self, audio: Path, caption: str) -> AlertResult: ...
+    async def send_audio(self, audio: Path | None, caption: str) -> AlertResult: ...
 
 
 class AlertChannel(Protocol):

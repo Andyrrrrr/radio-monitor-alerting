@@ -818,3 +818,60 @@ disturbed.
 **Revisit when** the faster-whisper latency on the real host is measured
 rather than inferred from a Mac (D25), or if station networking changes to wired
 ethernet (which would relax the wifi-chipset constraint).
+
+---
+
+## D28 — Delivery goes through a non-blocking outbox; a hung stage restarts the process
+
+**Decided 2026-10-09**, building the last pieces of the unattended week.
+
+**The problem this found.** Notifications were awaited **inline in the
+transcription stage**. On the station's wifi, a drop would make every Telegram
+upload block for its full 15 s timeout, so real traffic would sit untranscribed
+behind a dead network until the bounded queue filled and dropped it. Adding
+retries inside the send would only have made that worse. The retry design had to
+start by getting delivery out of the pipeline's way.
+
+**Decision.** `alerting/outbox.py`: the pipeline `submit()`s and moves on; one
+background worker delivers in order, retrying with exponential backoff. This is
+"ingest never blocks" (AGENTS.md) applied to delivery. Properties, each chosen
+for a reason:
+
+- **FIFO** — after an outage the operator reads the day back in sequence.
+- **Urgent items jump the queue and interrupt a backoff wait.** A distress alert
+  must not wait behind the retry of a routine push. A distress alert whose first
+  attempt failed retryably is re-submitted urgently.
+- **Bounded; the oldest routine item is dropped on overflow, loudly.**
+- **Gives up after `retry_window_s` (30 min).** A notification hours old is
+  noise; the recording is archived, so nothing is lost, only not pushed.
+- **Never retries a permanent failure** (`AlertResult.retryable`): a rejected
+  token fails identically forever, and retrying hides the configuration error
+  behind a delay. 429 and 5xx retry; 400/401/403/404 do not.
+- **Reports the gap when it ends.** One notice says how long delivery was down,
+  how many arrived late and how many gave up. Delivery that silently fell behind
+  is the quiet dishonesty the project exists to avoid.
+
+**Hung stages.** `StageTracker` records when ASR or detection entered a call; one
+stuck for more than `heartbeat_timeout_s` (120 s) raises `StageStalled` and the
+process exits — the same crash-and-restart rule as D24. "Busy for too long" and
+not "no output recently", because on this channel a healthy stage produces
+nothing for hours. faster-whisper has already shown 9 s to decode 1.9 s of
+audio (D25), so a model that hangs outright is plausible.
+
+**Restart notices and the daily check.** A "started" notice is the only sign,
+after a power cut, that the system recovered by itself; it is suppressed within
+10 minutes of the previous one so a crash loop cannot bury the one that matters.
+The daily check reports being alive **as a fact**, because on a channel this
+quiet "nothing happened" and "nothing works" look identical, and sending it
+through the real delivery path is also the end-to-end test of that path. Both
+read their last-sent time from the database, not memory, so a restart cannot
+forget it already sent today's.
+
+**What this does not cover.** A hang in the watchdog task itself; a process that
+is alive but whose notifications are all being dropped (the daily check would
+simply stop arriving, which is the signal); and `WatchdogSec=` / `sd_notify`,
+which would let systemd kill a hung-but-alive process and is not used.
+
+**Revisit when** a week of real traffic shows the outbox dropping or abandoning
+more than a handful, or when restarts under systemd prove frequent enough to
+lose meaningful traffic.
