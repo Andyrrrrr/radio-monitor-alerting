@@ -1243,3 +1243,75 @@ faster-whisper's loop is what `max_repeat_tokens` exists for.
 - Tier 2 and Pushover still unconfigured in this shell.
 
 ---
+
+## 2026-10-09 (evening) — Telegram live; deployment host decided; two process lessons
+
+**Who:** Parker · **Rig:** MCS 2000 station rig · **Live from 17:43 local** on Telegram
+
+### Telegram replaced Pushover as the primary carrier (D26)
+
+Distress alerts, silent health notices and **every transmission** now go to a
+Telegram bot, each transmission as **one message: the recording with the
+transcript as its caption**, playable inline. Reason: transcripts here are
+wrong in exactly the places that matter (one vessel came through as five
+different names in one incident), and the 16:41 pair proved that a clean 58 dB
+transmission can be unintelligible to the ear too. See D26 for what is given up
+(Pushover's emergency priority — acceptable only because this operator's phone
+is never on Do Not Disturb).
+
+`notify_every_transmission` is **off by default** and the example config says
+MARINE ONLY. `config.toml` is gitignored, so the switch-over to Telegram lives
+on the station machine only.
+
+**Setting up the bot, and how it went wrong.** The token and chat ID were
+entered into a hidden prompt in the wrong order, leaving the chat ID in both
+slots. Checks that caught it without printing a secret: token shape
+(`<digits>:<~35 chars>`), then Telegram's `getMe`, which returns the bot's
+public name. The chat ID is best fetched, not hunted for: message the bot, then
+call `getUpdates` and read the chat id from the reply. A bot cannot see a user
+who has not written to it first, and a `getUpdates` result of zero usually means
+that, or the wrong bot.
+
+### Deployment host: x86 N100 mini PC, not a Raspberry Pi
+
+Decided with the operator. Reasoning, so it is not re-argued: the docs already
+name x86 Linux as the target; faster-whisper is the deployment engine and is
+x86-optimised; price is the same (~$150 complete); no SD-card fragility; one
+platform fewer to keep working. **Buy one with Intel wifi (AX101/AX201), not
+Realtek RTL8821CE** — the station has wifi only, so the wireless chipset is
+load-bearing. Ubuntu Server, headless. The UFO202 stays at the station.
+
+**Power loss is acceptable by design.** The database is already WAL, so a cut
+loses at most the last transaction and cannot corrupt the file. The requirement
+is only that it comes back by itself — hence D24 (crash, let `systemd
+Restart=always` restart) rather than in-process recovery. No UPS.
+
+### Lesson: a stale process survived a "stop"
+
+Stopping the pipeline with `kill -INT` hit a wrapper shell, not the Python
+process. The old instance kept running **alongside** the new one, both capturing
+the same device and writing the same database, and the stale one would have
+sent a "nothing heard" notice every tick (its threshold had been forced to 0 for
+a Pushover test). Caught by listing processes, not by any alert.
+
+**After every restart: `pgrep -fl "vhfwatch.pipeline"` and confirm exactly one.**
+Under systemd this class of mistake disappears — one unit owns the process
+group — which is a point in favour of the N100 plan.
+
+### Verified end to end
+
+- Health notice via Pushover reached the phone with `no_audio_alert_hours`
+  forced to 0 (the silence alert works).
+- Telegram: text notice (silent) and an audio message with caption both arrived
+  and played.
+- A seven-clip demo set from 2026-09-23 was sent to the operator's own chat,
+  for showing others.
+
+### Still not built, and blocking an unattended week
+
+Daily self-test push; systemd units; per-stage heartbeats for ASR, detection and
+alerting (only the capture heartbeat exists); **retry of a failed notification
+across the station wifi drops** — a failed Telegram send is logged and lost.
+The first live transmission through the Telegram path has not yet been observed.
+
+---

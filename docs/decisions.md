@@ -783,3 +783,38 @@ never switch itself on.
 **Revisit when:** the operator's phone habits change; a weeklong run shows the
 message volume is too high to stay useful; or Telegram's availability becomes a
 dependency worth escaping (ntfy, self-hosted, is the fallback).
+
+---
+
+## D27 — The unattended host is an x86 N100 mini PC with Intel wifi, not a Raspberry Pi
+
+**Decided 2026-10-09** with the operator, for the week-long monitoring run.
+
+**Why x86.** `docs/conventions.md` §5 already commits the deployment target to
+x86 Linux, and `faster-whisper` — the deployment ASR engine — is built around
+x86 vector instructions. On a Pi 5 the likely outcome is dropping to `base.en`
+to stay near real time; on an N100, `small.en` runs comfortably faster than
+real time. Price is a wash (~$140–170 complete either way once a Pi has its
+PSU, cooler and storage), an NVMe drive removes the SD-card corruption that
+unattended Pis die of, and one fewer platform (no ARM Linux) has to be kept
+working alongside macOS.
+
+**Constraint worth the decision: Intel wifi (AX101 / AX201), not Realtek
+RTL8821CE.** The station has wifi only and no ethernet, so the wireless chip is
+load-bearing rather than incidental, and Realtek parts are a recurring Linux
+problem. If a listing does not name the chipset, assume Realtek.
+
+**What the operator waived, recorded so it is not rebuilt later.** A UPS is not
+needed — loss of power is acceptable provided the system **starts working again
+by itself**; the database is already WAL, so a cut loses at most the last
+transaction and does not corrupt it. Missing a transmission during a power or
+internet outage is acceptable. That is the framing in AGENTS.md (missed
+detections are acceptable; silent failure is not) and it is why D24 chose
+"crash and let the supervisor restart" over in-process recovery.
+
+**The interface stays at the station** (the UFO202), so the laptop rig is not
+disturbed.
+
+**Revisit when** the faster-whisper latency on the real host is measured
+rather than inferred from a Mac (D25), or if station networking changes to wired
+ethernet (which would relax the wifi-chipset constraint).
