@@ -1317,6 +1317,19 @@ exactly one.**
 - A seven-clip demo set from 2026-09-23 was sent to the operator's own chat,
   for showing others.
 
+### Verified live, later the same evening
+
+After the outbox, daily check and signal-handling work (D28), the pipeline was
+restarted on the new code on the station laptop. **The "started" notice and the
+daily "alive" check both reached the operator's phone through Telegram, silently**
+— the first time the outbox, the Telegram channel and the health path have been
+proven together outside a test. A restart 40 seconds later correctly sent neither
+(the 10-minute throttle and the once-per-day record both held), and SIGINT to the
+background process now shuts it down cleanly in about a second.
+
+Still unobserved: a **live transmission** through the Telegram path, and any of
+this on the N100.
+
 ### Still not built, and blocking an unattended week
 
 Daily self-test push; systemd units; per-stage heartbeats for ASR, detection and
