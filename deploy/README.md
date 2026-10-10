@@ -29,6 +29,14 @@ lspci -nn | grep -i network
   ships 6.8, so this works. **Do not use 22.04.**
 - **Realtek**: return it.
 
+**If the host is a refurbished HP ProDesk 600 G3 Mini** (or the similar
+EliteDesk 800 G3): the wifi is an optional factory part, and refurbishers
+sometimes fit their own. It is a single M.2 2230 card held by one screw with two
+antenna leads, so a Realtek card can be swapped for an Intel 8265 for roughly
+$10-15. Check that the antenna leads are actually connected, or the signal will be
+poor. Details and the questions to ask a seller are in `docs/decisions.md` (D27
+addendum).
+
 ## 1. System packages and user
 
 ```bash

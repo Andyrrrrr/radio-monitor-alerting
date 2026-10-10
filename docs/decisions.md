@@ -875,3 +875,44 @@ which would let systemd kill a hung-but-alive process and is not used.
 **Revisit when** a week of real traffic shows the outbox dropping or abandoning
 more than a handful, or when restarts under systemd prove frequent enough to
 lose meaningful traffic.
+
+### D27 addendum — 2026-10-09 (evening): what the shopping turned up
+
+**Status: the purchase is undecided.** The operator is waiting on a seller's answer.
+Recorded so the next session does not redo this research.
+
+**16 GB of RAM is not needed.** D27 and the first shopping list assumed 16 GB
+without measuring. Measured the same day: `faster-whisper` `small.en` (int8) peaks
+at **1.16 GB** resident while transcribing a 2-minute clip. 8 GB is ample, and
+buying 8 GB is the cheapest way to stay under budget. Disk is similarly small
+(~40 KB per recording; Ubuntu ~10 GB), so 120 GB is plenty.
+
+**The "$140-170 for an N100" figure was unverified and looks stale.** It came from
+memory. Live search results put 16 GB N100 boxes at roughly $130 to $250 and
+rising, and no sub-$150 listing could be confirmed.
+
+**A refurbished x86 business mini PC is an equally valid host.** The real
+requirement in D27 was "x86 with Intel wifi", not "N100". A candidate:
+**HP ProDesk 600 G3 Desktop Mini**, 6th-gen i5-6500T (AVX2, which the ASR engine
+wants), NVMe, ~$154 on eBay Refurbished with a 1-year warranty. Caveats found:
+
+- **Wifi was an optional factory extra** on this model, so a listing saying
+  "built-in WiFi" proves nothing about the chip. HP's own spec sheet lists only
+  **Intel** cards (8265, 7265, 3168, 7260), which is good, but refurbishers also
+  fit their own "WiFi 5/6 kits", some Realtek (e.g. RTL8852BE), which is the
+  risky kind on Linux. The card also needs its two internal antenna leads
+  connected, and a refurb can ship without them.
+- **The safety net:** the wifi is one M.2 2230 card held by a single screw. A
+  known-good Intel 8265 plus HP's antenna leads is roughly $10-15, so a bad card
+  is a small fix, not a return.
+- The item-specifics block of a variation listing ("up to i7, 32 GB") does not say
+  which configuration the displayed price is for.
+- The `Accessories: None` field raised the question of whether the power brick is
+  included; ask before buying.
+
+**Questions to put to the seller:** which wifi card is installed (Intel 8265 or
+other), whether the antenna leads are connected, whether the power adapter is
+included, and which option the quoted price covers.
+
+**On arrival either way:** `lspci -nn | grep -i network`. Intel: keep it.
+Realtek: return it, or on an HP mini swap the M.2 card.
