@@ -729,3 +729,57 @@ cheapest accuracy work available.
 **Revisit when:** labels exist (then measure WER properly), or when the station
 host is running and latency under real load can be measured on the N100 rather
 than inferred from a Mac.
+
+---
+
+## D26 — Telegram carries the recording and the transcript in one message
+
+**Decided 2026-10-09**, superseding Pushover as the primary carrier for this
+site and replacing `scripts/notify_transmissions.py`.
+
+**The problem.** Transcripts at this site are wrong in exactly the places that
+matter — vessel names came through as "Sir Muggis", "Sir budget", "For budget"
+and "For much assistance" for a single vessel; channel numbers and positions
+mangle routinely. Then on 2026-10-09 a transmission at **58.7 dB SNR** was
+unintelligible to **both ASR engines and to the operator's ear**. The recording
+is the evidence and the transcript is a convenience layered on it (AGENTS.md);
+an alert carrying only the convenience is the wrong way round.
+
+**Why not Pushover plus a link.** Pushover attaches **images only**, so audio
+has to live behind a URL. That URL points at the machine serving it, so it
+works on station wifi and fails on cell data. Fixing that means Tailscale on
+both ends, or exposing recordings publicly — more moving parts, and the second
+is unacceptable for recordings of real people.
+
+**Why Telegram.** `sendAudio` takes a **caption**, so one notification is the
+recording plus the transcript, playable inline with a scrubber. Outbound HTTPS
+only: no inbound ports, nothing exposed, works anywhere the host has internet.
+Files are ~30 KB.
+
+**What is given up, stated plainly:** Pushover's **emergency priority** —
+bypassing Do Not Disturb and re-alerting until acknowledged — has no Telegram
+equivalent. That mattered a great deal in D16. It does not matter *here*,
+because the operator's phone is **never** on Do Not Disturb and is always set
+to ring. **If that ever changes, this decision has to be revisited**, because
+nothing else in the system will wake someone who has silenced their phone.
+Pushover remains implemented and config-selectable for exactly that reason.
+
+**Scope limit, enforced by configuration and stated in the channel's own
+docstring:** this sends **audio off-box**. Marine Ch 16 is public broadcast
+traffic and the operator has accepted that explicitly. The fire/EMS audio in
+`data/corpus-fire/` is **not** — addresses and patient details are plausible
+there. Never point this channel at a rig monitoring anything but marine.
+
+**Rejections are sent, and labelled.** The bring-up script this replaces pushed
+a hallucination (`! ! ! ! ! ! !`) to the phone with no indication the pipeline
+had thrown it out. Per-transmission notifications now carry the gate's verdict
+with them — a rejected transcript still reaches the phone, because the radio
+really did hear something, but it says so.
+
+**Off by default** (`notify_every_transmission = false`). It is a monitoring
+aid, not the distress path, and a feature that sends audio off a machine should
+never switch itself on.
+
+**Revisit when:** the operator's phone habits change; a weeklong run shows the
+message volume is too high to stay useful; or Telegram's availability becomes a
+dependency worth escaping (ntfy, self-hosted, is the fallback).

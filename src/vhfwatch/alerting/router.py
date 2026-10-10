@@ -22,6 +22,7 @@ from vhfwatch.alerting.base import AlertChannel, LinkBuilder
 from vhfwatch.alerting.console import ConsoleAlertChannel
 from vhfwatch.alerting.macos import MacOSAlertChannel
 from vhfwatch.alerting.pushover import PushoverAlertChannel
+from vhfwatch.alerting.telegram import TelegramAlertChannel
 from vhfwatch.config import AlertingConfig
 from vhfwatch.models import AlertResult, Incident, Severity
 
@@ -140,6 +141,7 @@ def create_channels(
         + cfg.channels_urgent
         + cfg.channels_watch
         + cfg.channels_routine
+        + cfg.channels_health
     )
     channels: dict[str, AlertChannel] = {}
     for name in wanted:
@@ -147,6 +149,10 @@ def create_channels(
             channels[name] = ConsoleAlertChannel(local_timezone, link_for)
         elif name == "macos":
             channels[name] = MacOSAlertChannel(local_timezone)
+        elif name == "telegram":
+            channels[name] = TelegramAlertChannel(
+                cfg.telegram, local_timezone, link_for
+            )
         elif name == "pushover":
             channels[name] = PushoverAlertChannel(
                 cfg.pushover, local_timezone, link_for

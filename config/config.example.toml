@@ -124,18 +124,35 @@ max_incident_duration_s = 3600
 position_match_km       = 5.0  # position tie-break between candidate incidents
 
 [alerting]
-channels_critical = ["console", "macos", "pushover"]
-channels_urgent   = ["console", "macos", "pushover"]
+channels_critical = ["console", "telegram"]
+channels_urgent   = ["console", "telegram"]
 channels_watch    = ["console"]
 channels_routine  = []
 # Operational notices: capture stalled, nothing heard in N hours, daily
-# self-test. Deliberately NOT the incident channels — these go out at
-# Pushover priority 0 and must not bypass Do Not Disturb. An operator woken
-# at 03:00 for a dead USB cable stops trusting the alerts that matter.
-channels_health   = ["console", "pushover"]
+# self-test. Sent quietly (telegram silent_health) so the alerts that do ring
+# keep meaning something — an operator woken at 03:00 for a dead USB cable
+# stops trusting all of them.
+channels_health   = ["console", "telegram"]
+# Every transmission as a Telegram message: the RECORDING with the transcript
+# as its caption, playable inline. OFF by default — it sends audio off-box and
+# it is a monitoring aid, not the distress path.
+# WHY audio travels with the text: transcripts here are wrong in exactly the
+# places that matter (vessel names, positions, channel numbers), and on
+# 2026-10-09 a 58 dB SNR transmission was unintelligible to both ASR engines
+# AND to the operator's ear. The recording is the evidence (AGENTS.md).
+# ⚠️ MARINE ONLY. Ch 16 is public broadcast traffic. Never point this at a rig
+# monitoring fire/EMS — addresses and patient details are plausible there.
+notify_every_transmission = true
+channels_transmission     = ["telegram"]
+
 # No-ack escalation is Pushover emergency priority (retry until acked below),
 # not a separate router mechanism.
 dedupe_window_s   = 300
+
+[alerting.telegram]
+# Secrets are env-only: VHFWATCH_TELEGRAM_TOKEN, VHFWATCH_TELEGRAM_CHAT_ID
+timeout_s     = 15.0   # audio upload, not just a text POST
+silent_health = true   # health notices arrive without a sound
 
 [alerting.pushover]
 priority_critical = 2          # emergency: bypasses DND, re-alerts until acked

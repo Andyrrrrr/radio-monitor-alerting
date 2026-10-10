@@ -35,12 +35,13 @@ from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TypeVar
+from zoneinfo import ZoneInfo
 
 import structlog
 
 from vhfwatch.alerting import AlertRouter, create_channels
 from vhfwatch.asr import Transcriber, create_transcriber
-from vhfwatch.audio.encode import archive_audio
+from vhfwatch.audio.encode import archive_audio, playback_path_for
 from vhfwatch.audio.resample import ResamplingAudioSource
 from vhfwatch.audio.segmenter import Segmenter
 from vhfwatch.audio.sources import (
@@ -220,6 +221,13 @@ async def run(
                         transmission_id=tx.id,
                         reason=reason,
                     )
+                    await _notify_transmission(
+                        router,
+                        cfg,
+                        tx,
+                        text=None,
+                        rejected=f"not transcribed: {reason}",
+                    )
                     continue
                 transcript = await transcriber.transcribe(tx)
                 db.insert_transcript(transcript)
@@ -246,7 +254,13 @@ async def run(
                         reason=reject,
                         text=transcript.text[:120],
                     )
+                    await _notify_transmission(
+                        router, cfg, tx, text=transcript.text, rejected=reject
+                    )
                     continue
+                await _notify_transmission(
+                    router, cfg, tx, text=transcript.text, rejected=None
+                )
                 _drop_oldest_put(detect_queue, transcript, "detect", stats)
 
         async def detect() -> None:
@@ -463,6 +477,62 @@ async def _notify_health(
             continue
         if not result.ok:
             logger.warning("health.notify_failed", channel=name, detail=result.detail)
+
+
+async def _notify_transmission(
+    router: AlertRouter,
+    cfg: Settings,
+    tx: Transmission,
+    *,
+    text: str | None,
+    rejected: str | None,
+) -> None:
+    """Push one transmission — recording plus transcript — to the phone.
+
+    Why audio travels with the text: on this site the transcripts are often
+    wrong in the places that matter (vessel names, positions, channel
+    numbers), and on 2026-10-09 a 58 dB transmission proved unintelligible to
+    both engines AND to the operator's ear. The recording is the evidence;
+    the transcript is a convenience over it (AGENTS.md).
+
+    Rejections are sent too, LABELLED. The bring-up script this replaces
+    pushed a hallucination (`! ! ! ! ! ! !`) to the operator's phone with no
+    indication the pipeline had thrown it out — exactly the kind of quiet
+    dishonesty the record is supposed to prevent.
+    """
+    if not cfg.alerting.notify_every_transmission:
+        return
+    when = tx.started_at.astimezone(ZoneInfo(cfg.general.local_timezone))
+    snr = f"{tx.est_snr_db:.0f} dB" if tx.est_snr_db is not None else "?"
+    body = (text or "").strip() or "(no transcript)"
+    if rejected:
+        body = f"{body}\n\n⚠️ rejected by the hallucination gate: {rejected}"
+    caption = (
+        f"ch {cfg.general.channel} · {when.strftime('%H:%M:%S')} · "
+        f"{tx.duration_ms / 1000:.1f}s · SNR {snr}\n\n{body}"
+    )
+    audio = Path(tx.audio_path) if tx.audio_path else None
+    if audio is not None:
+        # Prefer the AAC playback copy: Opus-in-anything is unreliable on
+        # iOS (architecture §5.8), and these land on an iPhone.
+        audio = playback_path_for(audio) or audio
+    for name in cfg.alerting.channels_transmission:
+        channel = router.channels.get(name)
+        send_audio = getattr(channel, "send_audio", None)
+        if send_audio is None:
+            logger.warning("alert.channel_cannot_send_audio", channel=name)
+            continue
+        try:
+            result = await send_audio(audio, caption)
+        except Exception as e:  # noqa: BLE001 — never take the pipeline down
+            logger.warning(
+                "alert.transmission_notify_failed", channel=name, error=str(e)
+            )
+            continue
+        if not result.ok:
+            logger.warning(
+                "alert.transmission_notify_failed", channel=name, detail=result.detail
+            )
 
 
 async def _archive_and_store(

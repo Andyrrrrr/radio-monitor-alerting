@@ -178,6 +178,13 @@ class PushoverConfig(_Section):
     expire_s: int = 1800
 
 
+class TelegramConfig(_Section):
+    """Secrets are env-only: VHFWATCH_TELEGRAM_TOKEN, VHFWATCH_TELEGRAM_CHAT_ID."""
+
+    timeout_s: float = 15.0  # audio upload, not just a text POST
+    silent_health: bool = True  # health notices arrive without a sound
+
+
 class AlertingConfig(_Section):
     channels_critical: list[str] = ["console", "macos", "pushover"]
     channels_urgent: list[str] = ["console", "macos", "pushover"]
@@ -187,10 +194,16 @@ class AlertingConfig(_Section):
     # NOT the incident channels: health goes out at Pushover priority 0 and
     # must never bypass Do Not Disturb the way a mayday does.
     channels_health: list[str] = ["console", "pushover"]
+    # Every transmission, recording + transcript in one message. Off by
+    # default: this is a monitoring aid, not the distress alert path, and it
+    # sends audio off-box. Only audio-capable channels (telegram) qualify.
+    notify_every_transmission: bool = False
+    channels_transmission: list[str] = ["telegram"]
     # No-ack escalation is Pushover's emergency priority (retry until
     # acknowledged), not router logic — one mechanism, not two.
     dedupe_window_s: int = 300
     pushover: PushoverConfig = PushoverConfig()
+    telegram: TelegramConfig = TelegramConfig()
 
 
 class WebConfig(_Section):

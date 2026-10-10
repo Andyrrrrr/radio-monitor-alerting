@@ -8,10 +8,24 @@ itself. The incident page link is the rich layer, never the only path.
 
 from collections.abc import Callable
 from datetime import UTC
+from pathlib import Path
 from typing import Protocol
 from zoneinfo import ZoneInfo
 
 from vhfwatch.models import AlertResult, Incident
+
+
+class AudioCapableChannel(Protocol):
+    """A channel that can send a recording WITH its transcript attached.
+
+    Narrow and separate because most channels cannot: Pushover takes images
+    only, and a macOS banner has nowhere to put a file. Only channels that
+    implement this appear in `[alerting].channels_transmission`.
+    """
+
+    name: str
+
+    async def send_audio(self, audio: Path, caption: str) -> AlertResult: ...
 
 
 class AlertChannel(Protocol):

@@ -492,6 +492,8 @@ TOML via `pydantic-settings`, with env var override. `config/config.example.toml
 ```
 VHFWATCH_PUSHOVER_TOKEN
 VHFWATCH_PUSHOVER_USER
+VHFWATCH_TELEGRAM_TOKEN      # bot token from BotFather
+VHFWATCH_TELEGRAM_CHAT_ID    # the chat the bot posts to
 VHFWATCH_ANTHROPIC_API_KEY
 VHFWATCH_DEEPGRAM_API_KEY   # optional
 ```

@@ -13,12 +13,16 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from tests.synth import BASE
 from tests.test_alerting import RecordingChannel
 from tests.test_pipeline import FakeTranscriber
 from vhfwatch import pipeline
 from vhfwatch.alerting.router import AlertRouter
+from vhfwatch.audio.sources import FileAudioSource
 from vhfwatch.config import Settings
-from vhfwatch.models import AudioFrame
+from vhfwatch.models import AlertResult, AudioFrame
+
+FIXTURE = Path(__file__).parent / "fixtures" / "sample.wav"
 
 
 class _LiveSource:
@@ -142,3 +146,55 @@ def test_no_alert_before_the_limit(
     channel = _run_with_health(cfg, source, monkeypatch)
 
     assert channel.health == []
+
+
+class RecordingAudioChannel(RecordingChannel):
+    """A channel that can carry audio, like Telegram."""
+
+    def __init__(self, name: str = "telegram") -> None:
+        super().__init__(name)
+        self.audio: list[tuple[str, str]] = []
+
+    async def send_audio(self, audio: object, caption: str) -> AlertResult:
+        self.audio.append((str(audio), caption))
+        return AlertResult(channel=self.name, ok=True)
+
+
+def test_rejected_transcripts_are_notified_but_labelled(tmp_path: Path) -> None:
+    """The bring-up script this replaces pushed a hallucination to the
+    operator's phone with no sign the pipeline had thrown it out. A rejection
+    must still reach the phone — it is evidence the radio heard something —
+    but it must say so."""
+    cfg = Settings()
+    cfg.general.data_dir = tmp_path / "data"
+    cfg.alerting.notify_every_transmission = True
+    cfg.alerting.channels_transmission = ["telegram"]
+    channel = RecordingAudioChannel()
+    router = AlertRouter(cfg.alerting, {"telegram": channel})
+
+    source = FileAudioSource(FIXTURE, start_at=BASE)
+    # A repeated token is what the gate exists to catch (D25).
+    texts = ["! ! ! ! ! ! !", "mayday mayday this is vessel serenity"]
+    asyncio.run(pipeline.run(cfg, source, FakeTranscriber(texts), router))
+
+    assert len(channel.audio) == 2
+    rejected = [c for _, c in channel.audio if "rejected" in c]
+    assert len(rejected) == 1
+    assert "hallucination gate" in rejected[0]
+    # The clean one carries the transcript and no warning.
+    clean = [c for _, c in channel.audio if "rejected" not in c]
+    assert "vessel serenity" in clean[0]
+
+
+def test_transmission_notifications_are_off_by_default(tmp_path: Path) -> None:
+    """Sending audio off-box is opt-in: it is a monitoring aid, not the
+    distress path, and it must never switch itself on."""
+    cfg = Settings()
+    cfg.general.data_dir = tmp_path / "data"
+    channel = RecordingAudioChannel()
+    router = AlertRouter(cfg.alerting, {"telegram": channel})
+
+    source = FileAudioSource(FIXTURE, start_at=BASE)
+    asyncio.run(pipeline.run(cfg, source, FakeTranscriber(["radio check"]), router))
+
+    assert channel.audio == []
