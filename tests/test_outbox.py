@@ -7,6 +7,8 @@ rather than mocked.
 import asyncio
 from collections.abc import Awaitable, Callable
 
+import structlog.testing
+
 from vhfwatch.alerting.outbox import OutageSummary, Outbox
 from vhfwatch.models import AlertResult
 
@@ -176,3 +178,23 @@ def test_a_crashing_send_does_not_kill_the_worker() -> None:
         return log
 
     assert asyncio.run(go()) == ["after"]
+
+
+def test_successful_deliveries_are_logged_with_their_attempt_count() -> None:
+    """Absence of a failure line is not evidence a message arrived. A delivery
+    that needed retries must show it, which is how a recovered wifi drop is
+    visible after the fact."""
+
+    async def go() -> None:
+        log: list[str] = []
+        ob = make()
+        ob.submit("first-try", _sender(log, "first-try", []))
+        ob.submit("after-drop", _sender(log, "after-drop", [_down(), _down()]))
+        await _run_until(ob, lambda: ob.stats.delivered == 2)
+
+    with structlog.testing.capture_logs() as logs:
+        asyncio.run(go())
+
+    delivered = {e["label"]: e for e in logs if e["event"] == "outbox.delivered"}
+    assert delivered["first-try"]["attempts"] == 1
+    assert delivered["after-drop"]["attempts"] == 3

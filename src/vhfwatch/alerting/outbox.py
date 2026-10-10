@@ -229,6 +229,17 @@ class Outbox:
 
     def _succeeded(self, item: _Item) -> None:
         self.stats.delivered += 1
+        # Logged because absence of a failure is not evidence of delivery: the
+        # first live transmission through Telegram could only be confirmed from
+        # the operator's phone. `attempts` > 1 and a large `queued_s` are the
+        # signature of a wifi drop that recovered.
+        logger.info(
+            "outbox.delivered",
+            label=item.label,
+            attempts=item.attempts,
+            queued_s=round(self._clock() - item.submitted_at, 1),
+            urgent=item.urgent,
+        )
         if item.attempts > 1 and self._outage_started is not None:
             self._outage_late += 1
         if self._outage_started is None:

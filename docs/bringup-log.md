@@ -1340,9 +1340,11 @@ case that `est_snr_db` says nothing about intelligibility (see 16:41 above).
 
 Still unobserved: any of this on the N100.
 
-Note for later: the outbox logs failures and abandonments but **not successful
-deliveries**, so "no failure in the log" is the only server-side evidence a
-message arrived. Confirmation came from the operator's phone.
+Gap found, then fixed the same evening: the outbox logged failures and
+abandonments but **not successful deliveries**, so "no failure in the log" was
+the only server-side evidence a message arrived, and confirmation had to come
+from the operator's phone. It now logs `outbox.delivered` with the attempt count
+and time queued; a delivery with `attempts` above 1 is a recovered wifi drop.
 
 ### Still not built, and blocking an unattended week
 
