@@ -1327,8 +1327,22 @@ proven together outside a test. A restart 40 seconds later correctly sent neithe
 (the 10-minute throttle and the once-per-day record both held), and SIGINT to the
 background process now shuts it down cleanly in about a second.
 
-Still unobserved: a **live transmission** through the Telegram path, and any of
-this on the N100.
+**Then a live transmission went through it, too (19:12 local).** Three short
+transmissions (2.6-3.1 s) at **61-62 dB SNR** — the strongest signals this
+project has recorded — came through the station rig. The transcripts
+(`"Sail, take some flight."`, `"Person, stop."`, `"16, sensor,"`) were all
+**rejected on confidence** (average log-probability -1.2 to -1.8 against the
+-1.0 limit), and each still reached the operator's phone through Telegram as a
+recording with its transcript **labelled rejected**. The operator listened and
+**could not understand the audio either.** So the gate was right, the labelling
+was right, and the path worked end to end — and this is a second ear-confirmed
+case that `est_snr_db` says nothing about intelligibility (see 16:41 above).
+
+Still unobserved: any of this on the N100.
+
+Note for later: the outbox logs failures and abandonments but **not successful
+deliveries**, so "no failure in the log" is the only server-side evidence a
+message arrived. Confirmation came from the operator's phone.
 
 ### Still not built, and blocking an unattended week
 
