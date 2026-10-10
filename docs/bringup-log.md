@@ -1354,3 +1354,50 @@ across the station wifi drops** — a failed Telegram send is logged and lost.
 The first live transmission through the Telegram path has not yet been observed.
 
 ---
+
+## 2026-10-09 (late) — second capture stall: the watchdog worked, and nobody was told
+
+**Who:** Parker · **Rig:** MCS 2000 station rig, on the laptop
+
+At **19:42:23 local** the audio interface vanished from the system, exactly as on
+2026-09-23: absent from `audio_devices.py` and from the USB bus. The capture
+watchdog (D24) noticed 32 seconds later and the pipeline exited with
+`reason='capture stalled'`. **That part worked.** The 50-minute silent failure of
+9/23 became a 32-second one.
+
+**Cause not established.** The operator was ending the session at that moment, so
+it was most probably unplugged while packing up. If so this is not a second
+spontaneous dropout. It cannot be told apart from one from the log, so it is
+recorded as unexplained rather than closed.
+
+### The gap it exposed
+
+**The operator was told nothing.** The only notice was meant to come from the
+RESTART ("started — previous run ended after a capture stall"). On a laptop there
+is no supervisor, so there was no restart; and with a device that genuinely does
+not come back there never is one. The only signal left would have been a missing
+daily check at 09:00 the next morning, which is a long time to not be listening.
+
+**Fixed the same night:** both stall paths (capture and stage) now send a notice
+**before** exiting, through the outbox, which the shutdown path drains. A test
+asserts it, and that it names the likely cause and the stakes ("nobody is
+listening"). It applies equally under systemd, where it arrives alongside the
+restart.
+
+### Two facts about running this on a laptop
+
+- **The sleep block ends when the pipeline does.** `caffeinate -w <pid>` exits with
+  the process, so the moment a stall killed the pipeline the Mac was free to sleep.
+  Everything after 19:43 was then processed only during brief maintenance wakes,
+  which is why ordinary commands appeared to hang for minutes. It looked like a
+  stuck test and was not: the new test passes in 1.8 s.
+- **Nothing on a laptop restarts a dead pipeline.** That is the whole reason
+  `deploy/` exists. Until the station host is running, a stall means silence until
+  a human notices — and now, at least, a notice.
+
+### State left behind
+
+Pipeline **not running**; interface **not connected**; nothing is listening to Ch 16.
+169 tests pass, ruff and mypy clean.
+
+---

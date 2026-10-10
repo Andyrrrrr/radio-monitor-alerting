@@ -551,6 +551,17 @@ async def run(
                     db.insert_health_event(
                         stage, "stage_stalled", {"busy_for_s": round(busy_for, 1)}
                     )
+                    _notify_health(
+                        outbox,
+                        router,
+                        cfg,
+                        title=f"vhf-watch: {stage} stuck, restarting",
+                        message=(
+                            f"{stage} has been inside one call for "
+                            f"{busy_for:.0f}s at {cfg.general.site_name}. The "
+                            f"process is exiting so the supervisor can restart it."
+                        ),
+                    )
                     raise StageStalled(
                         f"{stage} stuck for {busy_for:.0f}s (limit {stage_limit_s:.0f}s)"
                     )
@@ -565,6 +576,24 @@ async def run(
                     )
                     db.insert_health_event(
                         "capture", "stalled", {"silent_for_s": round(silent_for, 1)}
+                    )
+                    # Say so BEFORE exiting. Relying on the restart's "started"
+                    # notice is not enough: with no supervisor (a laptop) or a
+                    # device that never comes back, there is no restart, and
+                    # the operator would learn of it only from a missing daily
+                    # check. The outbox is drained on the way out.
+                    _notify_health(
+                        outbox,
+                        router,
+                        cfg,
+                        title="vhf-watch: capture stalled, restarting",
+                        message=(
+                            f"No audio for {silent_for:.0f}s at "
+                            f"{cfg.general.site_name}. The audio interface may "
+                            f"be unplugged or have dropped off USB. The process "
+                            f"is exiting so the supervisor can restart it; if "
+                            f"nothing restarts it, nobody is listening."
+                        ),
                     )
                     raise CaptureStalled(
                         f"no audio frames for {silent_for:.0f}s (limit {stall_s:.0f}s)"

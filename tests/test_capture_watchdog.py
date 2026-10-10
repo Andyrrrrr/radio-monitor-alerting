@@ -384,3 +384,24 @@ def test_shutdown_works_even_when_sigint_is_ignored(
         asyncio.run(go())  # returns cleanly; a hang here would hit the timeout
     finally:
         signal.signal(signal.SIGINT, previous)
+
+
+def test_a_stall_tells_the_operator_before_the_process_exits(tmp_path: Path) -> None:
+    """Found the hard way on 2026-10-09: the interface came unplugged, the
+    watchdog correctly killed the pipeline, and the operator was told nothing,
+    because the only notice was meant to come from the RESTART. With no
+    supervisor (a laptop), or a device that never returns, there is no restart.
+    The notice has to go out on the way down."""
+    cfg = _cfg(tmp_path, stall_s=1)
+    cfg.alerting.channels_health = ["console"]
+    channel = RecordingChannel("console")
+    router = AlertRouter(cfg.alerting, {"console": channel})
+    source = _LiveSource(n=3, then_stall=True)
+
+    with pytest.raises(BaseExceptionGroup):
+        asyncio.run(pipeline.run(cfg, source, FakeTranscriber([]), router))
+
+    stalled = [m for t, m in channel.health if "capture stalled" in t]
+    assert len(stalled) == 1
+    assert "unplugged" in stalled[0]  # points at the likely cause
+    assert "nobody is listening" in stalled[0]  # and the stakes

@@ -676,6 +676,14 @@ cannot fake liveness.
 "live"`), and disarmed as soon as ingest finishes — a file source ending is not
 a stall. The first draft got this wrong and the quiet-channel test caught it.
 
+**Amendment 2026-10-09 (late): say so on the way down.** The first version relied on
+the restart's "started" notice to tell the operator. That fails exactly when it
+matters: on a laptop with no supervisor, or with a device that never returns,
+there is no restart, and the operator learns of it from a missing daily check the
+next morning. Both stall paths now send a notice before exiting, drained by the
+shutdown path. Found when the interface came unplugged at the end of a session
+and nothing said so.
+
 **What this does NOT cover,** and is still Phase 4 work: a radio that is
 powered off or tuned away, an antenna knocked loose, or a channel changed by a
 passer-by. All of those deliver perfectly good frames of silence. The
