@@ -157,6 +157,16 @@ class DetectConfig(_Section):
     # because "going" matched exactly, and fired a CRITICAL on real traffic
     # (docs/decisions.md D20).
     phonetic_min_token_similarity: float = 0.80
+    # Specific text windows that must never count as a FUZZY or PHONETIC hit.
+    # These are ordinary radio speech that merely looks like a watchword:
+    # "around" is one letter from "aground" (phonetic 0.957) and "boat in the
+    # water" scores 0.824 against "dead in the water". Exact matches are never
+    # affected, so a real "aground" still fires. Deliberately NOT the
+    # watchwords.toml `suppress` list, which drops every hit in a transcript
+    # that contains a routine phrase and would hide a real emergency that
+    # happened to contain one of these words. Each entry is a measured false
+    # positive on real Ch 16 traffic (docs/decisions.md D29).
+    fuzzy_ignore_phrases: list[str] = ["around", "go down", "boat in the water"]
     llm_min_words: int = 8  # classify longer transcripts even with no match
     llm_min_confidence: float = 0.6  # below this the LLM verdict only rates WATCH
     llm_timeout_s: float = 5.0

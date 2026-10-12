@@ -79,6 +79,7 @@ class WatchwordMatcher:
     ) -> None:
         self._cfg = cfg
         self._suppress = [normalize(t) for t in suppress]
+        self._ignore = {normalize(p) for p in cfg.fuzzy_ignore_phrases}
         self._terms: list[_Term] = []
         for severity, terms in groups.items():
             for raw in terms:
@@ -179,6 +180,9 @@ class WatchwordMatcher:
                 continue
             if n > 1 and not self._every_token_similar(tokens[i : i + n], term.tokens):
                 continue
+            if window in self._ignore:
+                self._log_ignored(term, window, similarity)
+                continue
             if best_phonetic is None or similarity > best_phonetic.score:
                 best_phonetic = WatchwordHit(
                     term.text, term.severity, "phonetic", window, similarity
@@ -186,6 +190,21 @@ class WatchwordMatcher:
         if best_phonetic is not None:
             return best_phonetic
         return self._match_fuzzy(term, tokens, n)
+
+    def _log_ignored(self, term: _Term, window: str, score: float) -> None:
+        """A discard, so it gets a reason (docs/conventions.md §4).
+
+        Logged only when the window WOULD have been a hit, which makes the log
+        the review queue for the ignore list: an entry that never appears here
+        is dead weight, and one that appears constantly may be hiding a real
+        problem.
+        """
+        logger.info(
+            "watchwords.window_ignored",
+            term=term.text,
+            window=window,
+            score=round(score, 3),
+        )
 
     def _every_token_similar(
         self, window_tokens: list[str], term_tokens: list[str]
@@ -215,6 +234,10 @@ class WatchwordMatcher:
             for i in range(len(tokens) - n + 1):
                 window = " ".join(tokens[i : i + n])
                 score = fuzz.ratio(window, term.text) / 100.0
+                if window in self._ignore:
+                    if score >= self._cfg.fuzzy_min_ratio:
+                        self._log_ignored(term, window, score)
+                    continue
                 if score > best_score:
                     best_score = score
                     best_window = window

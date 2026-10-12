@@ -111,6 +111,18 @@ phonetic_min_token_len  = 4
 # joined string. "going to" scored 0.915 against "going down" on the strength
 # of "going" alone and fired a CRITICAL on real traffic (D20).
 phonetic_min_token_similarity = 0.80
+# Specific text windows that must never count as a FUZZY or PHONETIC hit:
+# ordinary radio speech that merely looks like a watchword. Each entry below is
+# a measured false positive on real Ch 16 traffic ("around" scores 0.957 against
+# "aground"; "boat in the water" 0.824 against "dead in the water"; "go down"
+# 0.824 against "going down"). Exact matches are NEVER affected, so a real
+# "aground" still fires. This is deliberately not the watchwords.toml `suppress`
+# list, which drops every hit in a transcript containing a routine phrase and
+# would hide a real emergency that happened to contain one of these words.
+# Add an entry only when a false positive has actually been observed, and look
+# for `watchwords.window_ignored` in the log: an entry that never appears there
+# is dead weight (docs/decisions.md D29).
+fuzzy_ignore_phrases  = ["around", "go down", "boat in the water"]
 llm_min_words         = 8      # classify longer transcripts even with no match
 llm_min_confidence    = 0.6    # below this the LLM verdict only rates WATCH
 llm_timeout_s         = 5.0

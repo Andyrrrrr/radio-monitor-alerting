@@ -924,3 +924,54 @@ included, and which option the quoted price covers.
 
 **On arrival either way:** `lspci -nn | grep -i network`. Intel: keep it.
 Realtek: return it, or on an HP mini swap the M.2 card.
+
+---
+
+## D29 — A narrow ignore list for measured fuzzy/phonetic false positives
+
+**Decided 2026-10-12**, from the first real traffic on the station rig.
+
+**The evidence.** Replaying all 54 stored real transcripts through the matcher
+found exactly three non-exact hits, and **all three were false positives**:
+
+| Matched text | Against term | Pass | Score |
+|---|---|---|---|
+| `around` ("coming around Mendoza") | `aground` | phonetic | 0.957 |
+| `boat in the water` ("put your boat in the water") | `dead in the water` | fuzzy | 0.824 |
+| `go down` ("Japan, go down") | `going down` (CRITICAL term) | fuzzy | 0.824 |
+
+Two of them opened WATCH incidents live on 2026-10-12, within an hour of each
+other.
+
+**Their cost was low, and that shaped the fix.** The detector already caps every
+non-exact hit at WATCH (architecture §5.5), so even the one that matched a
+CRITICAL term could only ever have produced a console-level WATCH. None reached
+the operator's phone beyond the normal per-transmission message. This is noise
+reduction, not a safety fix, and it is sized accordingly.
+
+**Decision.** `[detect] fuzzy_ignore_phrases`: specific normalized windows that can
+never be a fuzzy or phonetic hit. Defaults to the three above.
+
+- **Exact matches are never affected.** The exact pass runs first, so a real
+  "aground", "dead in the water" or "going down" still fires. A test asserts it.
+- **Deliberately not the `suppress` list.** `suppress` drops every hit in a
+  transcript containing a routine phrase; putting "around" there would hide a real
+  mayday that happened to mention it. A test asserts a mayday containing "around"
+  still fires.
+- **Narrow on purpose.** It names windows, not families, so an ASR mangling of a
+  real term still gets through ("dad in the water", "a ground" both still match).
+- **Every ignore is logged** (`watchwords.window_ignored`, only when the window
+  *would* have been a hit), so the log is the review queue for the list.
+
+**What it does not fix.** It is reactive: it only removes false positives already
+observed. "ground" is not on the list, and "we are on the ground" still produces a
+phonetic WATCH on "aground" — left alone because it has not been seen in real
+traffic, and a list built from speculation grows without bound. The class-level
+fix for phrases ("boat" vs "dead") is a per-token similarity check on fuzzy hits,
+as D20 did for the phonetic pass; it would not have caught "go down", where
+"go"/"going" are similar and "down" is identical. Still open and still unbuilt.
+
+**Revisit when** the list grows past roughly a dozen entries (the approach is then
+wrong and the matcher's thresholds need rethinking), or an ignored window turns
+out to have hidden a real distress call.
+

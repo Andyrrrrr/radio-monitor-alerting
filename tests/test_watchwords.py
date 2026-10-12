@@ -8,6 +8,7 @@ before a rig quietly stops matching anything.
 from pathlib import Path
 
 import pytest
+import structlog.testing
 
 from vhfwatch.config import DetectConfig
 from vhfwatch.detect.watchwords import WatchwordMatcher, normalize
@@ -186,3 +187,76 @@ def test_one_exact_token_cannot_carry_a_bad_one(matcher: WatchwordMatcher) -> No
     # string let "going" alone drag "going to" to 0.915 against "going down".
     assert [h for h in matcher.match("we are going to the fuel dock")] == []
     assert [h for h in matcher.match("we are going down") if h.term == "going down"]
+
+
+# -- fuzzy_ignore_phrases: measured false positives on real Ch 16 traffic -----
+# Every transcript below is REAL, from the 2026-10-12 station-rig session
+# (docs/decisions.md D29). They are the regression guard for the ignore list.
+
+REAL_FALSE_POSITIVES = [
+    # "around" is one letter from "aground": phonetic hit at 0.957.
+    (
+        "Hey, good afternoon, we're at the ATB on your port side there, just north "
+        "of Mendoza Island. We're going to be coming around Mendoza and head down "
+        "to Bellingham channel. We'll keep you guys on the starboard."
+    ),
+    # "boat in the water" scores 0.824 against "dead in the water".
+    (
+        "Let's go on the thing of Cat Island. You guys take the boat to our cabin. "
+        "I'm going to put your boat in the water. Are you to cook our dishes, over?"
+    ),
+    # "go down" scores 0.824 against the CRITICAL term "going down".
+    "Japan, go down.",
+]
+
+
+@pytest.mark.parametrize("text", REAL_FALSE_POSITIVES)
+def test_real_false_positives_no_longer_match(
+    matcher: WatchwordMatcher, text: str
+) -> None:
+    assert matcher.match(text) == []
+
+
+def test_ignore_list_never_hides_an_exact_match(matcher: WatchwordMatcher) -> None:
+    """The whole safety argument: ignoring a LOOK-ALIKE window must never stop
+    the real term firing. A real "aground" is an exact hit, and the exact pass
+    runs before any fuzzy or phonetic logic."""
+    for text, term in [
+        ("we are aground on the rocks", "aground"),
+        ("we are dead in the water", "dead in the water"),
+        ("we are going down", "going down"),
+    ]:
+        hits = {h.term: h for h in matcher.match(text)}
+        assert hits[term].kind == "exact"
+
+
+def test_ignore_list_does_not_hide_a_mayday_that_mentions_around(
+    matcher: WatchwordMatcher,
+) -> None:
+    """Why the ignore list is NOT the watchwords.toml `suppress` list, which
+    drops every hit in a transcript containing a routine phrase."""
+    hits = matcher.match("mayday mayday we are coming around the point")
+    assert any(h.term == "mayday" and h.kind == "exact" for h in hits)
+
+
+def test_garbled_versions_still_match(matcher: WatchwordMatcher) -> None:
+    """The list is narrow on purpose. It names specific benign windows, not
+    families, so an ASR mangling of a real term still gets through."""
+    assert any(h.term == "dead in the water" for h in matcher.match("dad in the water"))
+    assert any(h.term == "aground" for h in matcher.match("we are a ground"))
+
+
+def test_ignored_windows_are_logged_with_a_reason(matcher: WatchwordMatcher) -> None:
+    """Discards get reasons (docs/conventions.md §4). The log is also the review
+    queue for the list: an entry that never appears is dead weight."""
+    with structlog.testing.capture_logs() as logs:
+        matcher.match("coming around the point")
+    ignored = [e for e in logs if e["event"] == "watchwords.window_ignored"]
+    assert len(ignored) == 1
+    assert ignored[0]["window"] == "around"
+    assert ignored[0]["term"] == "aground"
+
+
+def test_ignore_list_is_configurable() -> None:
+    off = WatchwordMatcher.from_toml(DetectConfig(fuzzy_ignore_phrases=[]), EXAMPLE)
+    assert any(h.term == "aground" for h in off.match("coming around the point"))

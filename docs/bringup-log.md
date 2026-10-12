@@ -1446,3 +1446,27 @@ anything on the station host (N100 or HP), which is where the recovery tests in
 `deploy/README.md` section 8 come in.
 
 ---
+
+### 2026-10-12 (later) — the first detections on real traffic, both false positives
+
+Two WATCH incidents opened in one hour: **"put your boat in the water"** matched
+`dead in the water` (fuzzy, 0.8235 against a 0.82 cutoff — it cleared the bar by
+0.0035), and **"coming around Mendoza"** matched `aground` (phonetic, 0.957).
+Neither reached the phone beyond the normal transmission message: non-exact hits
+only ever rate WATCH, which goes to the console. Both closed themselves after the
+five-minute quiet period.
+
+Built `[detect] fuzzy_ignore_phrases` (D29) after replaying all 54 stored real
+transcripts: three non-exact hits, all false, now zero. Verified that a real
+"aground", "dead in the water" and a mayday that mentions "around" still fire.
+
+**Also in this session: names read consistently across transcripts are trustworthy,
+names that vary are not.** "Blue sky" came out the same in two separate
+transmissions (a sailboat); the island was transcribed "Indovia", "Andobe" and
+"Mendoza" — three spellings of one place, almost certainly Vendovi Island, which
+sits at the mouth of the Bellingham Channel the same transcript names. Worth
+remembering when reading these: agreement between independent transcriptions is
+evidence, and disagreement is the model telling you it is guessing.
+
+---
+
