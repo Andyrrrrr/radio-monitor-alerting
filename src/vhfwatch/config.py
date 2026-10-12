@@ -174,6 +174,17 @@ class DetectConfig(_Section):
     llm_context_count: int = 3  # preceding transmissions passed as context
 
 
+class PositionConfig(_Section):
+    """Map links for coordinates spoken on the radio (detect/position.py, D30)."""
+
+    enabled: bool = True
+    # [lat_min, lat_max, lon_min, lon_max]. A position outside it is still shown
+    # but flagged "probably misheard" — never silently dropped, because a real
+    # call from far away would otherwise vanish. Empty = no check. West
+    # longitudes are negative.
+    expected_area: list[float] = []
+
+
 class CorrelatorConfig(_Section):
     quiet_period_s: int = 300  # no activity → close incident
     vessel_match_ratio: float = 0.80
@@ -259,6 +270,7 @@ class Settings(BaseSettings):
     asr: AsrConfig = AsrConfig()
     hallucination: HallucinationConfig = HallucinationConfig()
     detect: DetectConfig = DetectConfig()
+    position: PositionConfig = PositionConfig()
     correlator: CorrelatorConfig = CorrelatorConfig()
     alerting: AlertingConfig = AlertingConfig()
     web: WebConfig = WebConfig()

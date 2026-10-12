@@ -129,6 +129,18 @@ llm_timeout_s         = 5.0
 llm_model             = "claude-haiku-4-5-20251001"
 llm_context_count     = 3      # preceding transmissions passed as context
 
+[position]
+# Coordinates spoken on the radio become a Google Maps link beside the transcript
+# and recording (detect/position.py, D30). Parsed from the transcript, which is
+# wrong about numbers more often than about anything else, so the message says
+# "read from the transcript, check it against the recording".
+enabled = true
+# [lat_min, lat_max, lon_min, lon_max]. A position outside this box is still shown
+# but flagged "probably misheard", never silently dropped. West longitudes are
+# negative. Leave empty for no check. Example for the Salish Sea:
+#   expected_area = [46.0, 52.0, -130.0, -120.0]
+expected_area = []
+
 [correlator]
 quiet_period_s          = 300  # no activity → close incident
 vessel_match_ratio      = 0.80

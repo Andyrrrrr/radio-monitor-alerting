@@ -1470,3 +1470,21 @@ evidence, and disagreement is the model telling you it is guessing.
 
 ---
 
+### 2026-10-12 (later) — coordinates become a map link (D30), built but unproven live
+
+At the operator's request, a position spoken on the radio now appears as a Google
+Maps link beside the transcript and recording. Built conservatively (both axes,
+range checks, labelled "read from the transcript", flagged if outside
+`[position] expected_area`) because a confident wrong pin is worse than none.
+
+Verified with two clearly labelled TEST messages sent to the operator's Telegram,
+built by the real code: the operator's own example `48°44'45.2"N 122°34'15.3"W`
+and the same position as spoken digits. Both produce a link; tap-through to the
+map is the operator's check. **No real position call has been heard yet**, so the
+number-word handling is untested against real transcriber output.
+
+The tests caught a real bug first: a minus sign was being deleted, which would have
+put `-122.57` in Siberia. See D30.
+
+---
+

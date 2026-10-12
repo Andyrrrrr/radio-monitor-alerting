@@ -64,6 +64,7 @@ from vhfwatch.detect import (
     gate_transmission,
     unrunnable_checks,
 )
+from vhfwatch.detect.position import find_positions, format_position
 from vhfwatch.health.watchdog import (
     CaptureStalled,
     PipelineStalled,
@@ -718,9 +719,30 @@ def _notify_transmission(
     body = (text or "").strip() or "(no transcript)"
     if rejected:
         body = f"{body}\n\n⚠️ rejected by the hallucination gate: {rejected}"
+    # Positions go BEFORE the transcript: a caption is cut at 1024 characters,
+    # and a long transcript must never be what pushes the map link off the end.
+    # Not read from a rejected transcript: that text is a suspected hallucination.
+    position_block = ""
+    if cfg.position.enabled and text and not rejected:
+        positions = find_positions(text)
+        for position in positions:
+            logger.info(
+                "position.found",
+                transmission_id=tx.id,
+                lat=round(position.lat, 5),
+                lon=round(position.lon, 5),
+                read_from=position.read_from,
+            )
+        if positions:
+            position_block = (
+                "\n".join(
+                    format_position(p, cfg.position.expected_area) for p in positions
+                )
+                + "\n\n"
+            )
     caption = (
         f"ch {cfg.general.channel} · {when.strftime('%H:%M:%S')} · "
-        f"{tx.duration_ms / 1000:.1f}s · SNR {snr}\n\n{body}"
+        f"{tx.duration_ms / 1000:.1f}s · SNR {snr}\n\n{position_block}{body}"
     )
     audio = Path(tx.audio_path) if tx.audio_path else None
     if audio is not None:

@@ -1015,3 +1015,59 @@ suitable.
 with a return window. Price differences here ($82 to $154) are smaller than the cost
 of a week lost to a wifi chip that does not work on Linux.
 
+---
+
+## D30 — Coordinates spoken on the radio become a map link beside the transcript
+
+**Decided 2026-10-12**, at the operator's request: if a position is called out,
+show where it is without having to write it down and type it into a map.
+
+**What it does.** `detect/position.py` finds latitude/longitude pairs in a
+transcript and the per-transmission Telegram message gains a line like
+`📍 48.7459°N 122.5709°W (read from the transcript, check it against the recording)`
+and a Google Maps link, **above** the transcript so a caption cut at 1024
+characters cannot push it off the end. Pure functions: no network, no LLM, so it
+works with the network unplugged (AGENTS.md constraint 5).
+
+**The central judgment call: a wrong pin that looks confident is worse than none.**
+Numbers are the weakest thing the transcriber produces: on 2026-09-07 "one two two
+degrees" came back as "one, two, two screens". So every choice leans toward finding
+fewer positions rather than inventing them:
+
+- **Both axes required**, each ending in a hemisphere. A lone "48 degrees north" is
+  not a position.
+- **Ranges checked** (latitude <= 90, longitude <= 180, minutes and seconds < 60).
+- **Something must say a number is a coordinate**: a degree sign or word, minutes,
+  or decimal places. "Channel 16 north" cannot qualify.
+- **Always labelled as read from the transcript**, with the parsed values shown, so
+  it can be checked against the recording beside it.
+- **`[position] expected_area`**: a position outside the box is shown but flagged
+  "probably misheard", **never silently dropped**. A real call from far away must not
+  vanish, and a "122 degrees EAST" misheard from west is exactly what this catches.
+- Not read from a transcript the confidence gate rejected: that text is a suspected
+  hallucination.
+
+**A bug the tests caught before it shipped.** The first version turned every hyphen
+into a space, which deleted the minus sign: `48.7459, -122.5709` came back with
+longitude **+**122.57, a pin in Siberia. Hyphens now split only words
+("forty-eight"). It is now a named regression test.
+
+**Formats handled:** written (`48°44'45.2"N 122°34'15.3"W`, degrees and decimal
+minutes, decimal degrees with a hemisphere, a signed decimal pair) and spoken as a
+transcriber writes it: digits (`48 degrees 44 minutes north`), digit-by-digit words
+(`four eight degrees four four decimal two minutes`), compound tens (`forty-eight`),
+`one hundred twenty-two`, and comma-split digits. 17 real transcripts, including the
+tug-and-sailboat exchange full of "north of ... Island", produce no position.
+
+**Honestly untested on a real call.** Nobody has spoken coordinates on the channel
+since this was built, so it has been verified against synthetic transcripts and
+real non-position traffic, not a real position report. The first real one is the
+actual test.
+
+**Not done, deliberately:** the incident-alert body (`format_body`) does not carry
+the link, though the LLM tier can extract coordinates. Only the per-transmission
+message does. Positions are logged (`position.found`) but not stored as rows.
+
+**Revisit when** the first real position call shows what the transcriber does with
+it, which will say whether the number-word handling needs to grow or shrink.
+
