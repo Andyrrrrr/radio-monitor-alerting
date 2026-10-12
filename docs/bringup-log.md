@@ -1401,3 +1401,48 @@ Pipeline **not running**; interface **not connected**; nothing is listening to C
 169 tests pass, ruff and mypy clean.
 
 ---
+
+## 2026-10-12 — station rig back up; the full path proven on a real broadcast
+
+**Who:** Parker · **Rig:** MCS 2000 station rig, WCG16 · **Started 08:25 local**
+
+Interface replugged after the 10-09 stall; idle floor **-91.3 dBFS**, exactly as
+calibrated. Pipeline restarted on the latest code (stall notice before exit,
+`outbox.delivered` logging).
+
+**Every part of the health path has now fired for real:**
+
+- "Started" notice — delivered, silent.
+- **Daily check at 09:00 sharp** — delivered to Telegram in 1.8 s on the first
+  attempt, reporting 0 transmissions in 24 h, floor -91.5 against -91.3, and
+  "No traffic is normal for this channel; audio is flowing." The first daily check
+  since the fix.
+- Every delivery is visible in the log as `outbox.delivered`.
+
+**First readable live transmission on the station rig, 09:12:07, 15.9 s.** A
+Canadian Coast Guard (Victoria) broadcast calling all stations, announcing a notice
+about repair work on the New Westminster Railway Bridge and moving to a working
+channel. SNR 58.3 dB, peak -13.5 dBFS, accepted by the gate, in Telegram about 6 s
+after it ended with its recording. The operator **confirmed receipt on his phone**.
+
+Two transcript errors, both inferred: "educational warning" is almost certainly
+"navigational warning", and "switching lessons" is probably "switching to channel
+[number]" — and the channel number is the one thing a listener would want, and it
+did not survive. The recording beside the transcript is what makes that
+recoverable.
+
+**The operator's observation matters:** it was a *very distant* station in Canada,
+which is why it was hard to understand. That is the same finding as 16:41 and
+19:12 on 10-09, from the other side — SNR 58 dB on a transmission a human also
+found hard to follow. `est_snr_db` measures level above the noise floor, never
+readability, and a distant station arrives at full level through the FM squelch.
+Here the machine got most of it where it had failed on the others, which suggests
+intelligibility, not level, is what separates them.
+
+**Proven end to end, outside tests, on the real system:** capture, segmentation,
+transcription, the confidence gate, delivery with audio, delivery logging, the
+started notice, the daily check, and clean signal handling. **Still unproven:**
+anything on the station host (N100 or HP), which is where the recovery tests in
+`deploy/README.md` section 8 come in.
+
+---
