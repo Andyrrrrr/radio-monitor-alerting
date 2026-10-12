@@ -975,3 +975,43 @@ as D20 did for the phonetic pass; it would not have caught "go down", where
 wrong and the matcher's thresholds need rethinking), or an ignored window turns
 out to have hidden a real distress call.
 
+### D27 addendum 2 — 2026-10-12: candidates evaluated, and how to choose
+
+**Still undecided.** Recorded so the next session starts from the answer, not the search.
+
+**Candidates, in the order the operator found them:**
+
+| Candidate | Price | Verdict |
+|---|---|---|
+| HP ProDesk 600 G3 Mini, i5-6500T (eBay Refurbished) | $154 | Seller confirmed a "Wi-Fi 5" card and power cables; chip and antennas still unanswered |
+| Generic "HP Mini Desktop, up to i5 8th gen" | $139 | **Passed.** Names no model, so the wifi hardware cannot be checked |
+| NIMO MPL1P, N100, 4 GB, 128 GB | $89.99 | **Passed unless the seller names the wifi chip.** Obscure brand, RAM is soldered, so the wifi probably is too and could not be swapped |
+| Dell OptiPlex 3050 Micro, i5-7500T, 8 GB, 250 GB (Marketplace, Lynnwood) | $100 cash | **Conditional.** Listing never mentions wifi, and wifi was an optional add-on on this model, so there may be none. In-person pickup allows a test — see below |
+| **HP EliteDesk 800 G3 Mini DM 35W, i5-6500T, 8 GB, 256 GB NVMe, "Wi-Fi"** (eBay, seller fortex24) | **$81.99 or best offer** | **Best so far.** Named model, a photo of the unit's own BIOS screen (June 2023), adapter visible in the photos. Used, so less return protection; chip and antennas unconfirmed |
+
+**A correction worth keeping: "W/AC" in an eBay title means "with AC adapter", not
+wifi.** One search summary got this wrong. A listing titled "...No-WiFi HDMI W/AC"
+shows the two are independent.
+
+**Every candidate must clear the same three questions**, put to the seller before
+buying: which wifi card is installed (Intel 8265 / 7265 / 3168 or another brand);
+are the internal antenna leads connected; is the power adapter included, and what
+is the return policy. On arrival, `lspci -nn | grep -i network`: Intel, keep it.
+
+**The test that removes the uncertainty for an in-person purchase:** bring a
+bootable Ubuntu USB stick, boot the machine from it at the seller's, run
+`lspci -nn | grep -i network` and try joining a phone hotspot. Five minutes, and
+it replaces every unknown above. Cash-only, no-warranty sales make this the only
+protection there is.
+
+**If a unit has no wifi or the wrong chip:** HP and Dell minis take the card in one
+M.2 2230 slot, so an Intel 8265 plus antenna leads is roughly $10-15. A USB wifi
+dongle also works but is one more thing to fail unattended, which is what this
+project is trying to avoid. And ask whether the station has an ethernet jack near
+the radio: that removes the question entirely and would make almost any of these
+suitable.
+
+**Selection rule:** among units that clear the three questions, take the cheapest
+with a return window. Price differences here ($82 to $154) are smaller than the cost
+of a week lost to a wifi chip that does not work on Linux.
+
