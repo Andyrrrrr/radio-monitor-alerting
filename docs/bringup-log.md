@@ -1488,3 +1488,32 @@ put `-122.57` in Siberia. See D30.
 
 ---
 
+
+### 2026-10-12 (evening) — a long live afternoon on the station rig
+
+Station rig (MCS 2000 tap), Telegram on for every transmission, unattended from
+about 14:00 while the operator was out on fire calls. About 6 hours running; no
+errors, no stalls, every message delivered on the first attempt
+(`outbox.delivered attempts=1` throughout).
+
+- **15:54–16:03 PT, Pan-Pan exchange (Victoria Coast Guard):** "pan pan" opened an
+  URGENT incident correctly. Ten transmissions followed (Coast Guard side only; the
+  vessel was never audible), moving the vessel to Ch 83A and tasking a boat named
+  Providence to assist. Incident closed on its quiet period with 2 detections
+  (`pan pan`, then `securite` merged in). The operator listened to the 16:03:05
+  line, whose transcript read as nonsense ("no mercy, Victor ... Gang Jesus Task"),
+  and heard the same words: the transcript was faithful to the audio and the
+  oddness is in the speech, so a low `no_speech_prob` is not evidence of a wrong
+  transcript, nor does a nonsensical one prove an error.
+- **16:30:51:** Coast Guard asked an unidentified station "Station calling, pan-pan
+  ... do you require assistance?" — URGENT incident, nothing followed, closed after
+  the quiet period.
+- **18:41–18:42:** U.S. Coast Guard, "Vessel in distress ... please say again your
+  GPS position" and a relay "somewhere in Vancouver". **No detection fired**: there
+  is no 'distress' term in any watchword tier (see status.json known_issues).
+  No coordinates were spoken, so the D30 map-link feature is still unproven on a real
+  call.
+- A 3 s clip at 18:48 transcribed to just "!" (no_speech 0.56): a weak or clipped
+  keying, not diagnosable from the text.
+
+---
