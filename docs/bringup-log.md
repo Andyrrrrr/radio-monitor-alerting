@@ -1517,3 +1517,34 @@ errors, no stalls, every message delivered on the first attempt
   keying, not diagnosable from the text.
 
 ---
+
+### 2026-10-17 — a full day on the station rig; the mini host is in hand but not installed
+
+Station rig (MCS 2000 tap, UFO202 left channel) on the Mac, Telegram on for every
+transmission, 10:43-19:22 PT. 37 transmissions recorded (31 with some text), every
+Telegram message delivered on the first attempt, no stalls or errors.
+
+- **Radio off at start:** the first start measured a floor of -95.9 dBFS (calibrated
+  -91.3) because the operator had not switched the radio on; a click at 10:44 was
+  cable handling. Restarted with the radio on. The live floor is only reported in the
+  daily self-test and at shutdown, so there was no direct reading after the restart.
+- **Long non-speech preambles:** three Coast Guard "all stations" broadcasts (10:49,
+  16:50, 17:07) began with 19-26 s of steady sound (one dominant pitch ~1380 Hz, constant
+  level) before speech; Whisper found words only at the end. Not skipped speech. A routine
+  weather announcement at 18:27 had no preamble, so the steady sound is probably an alert
+  signal before urgent broadcasts (a guess; the operator has not yet listened).
+- **Coast Guard cases heard (Coast Guard side only, the vessels were weak or silent):**
+  13:25-13:27 a vessel asked for position, persons aboard and a landline/cell number;
+  14:49-14:54 a dinghy photo/identification request with a phone number read out (the
+  position parser correctly ignored it); 16:41-17:07 sailing vessel "Footloose" with engine
+  issues, calls then a Pan-Pan broadcast (URGENT incident, correctly opened) then a broadcast
+  with a position. Only the 'pan pan' calls produced an incident. See status.json known_issues
+  for the four detection gaps this exposed.
+- **Name mis-hearings:** one Coast Guard unit name came out as "anonymous in", "Santa Ana"
+  and "Nautilus" in consecutive transmissions; treat proper names as guesses.
+- **Mini host:** an HP EliteDesk Mini (Core i5 vPro, Windows Pro sticker, 3 DisplayPort,
+  4 USB-A, Ethernet) is in hand, powered but not set up. Still needed: a USB stick (8 GB+),
+  the wifi card name (Device Manager), and a borrowed monitor and keyboard. Plan is
+  Ubuntu Server 24.04 then deploy/README.md. Pipeline stopped for the day.
+
+---
