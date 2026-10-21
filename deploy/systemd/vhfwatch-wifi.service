@@ -1,0 +1,13 @@
+[Unit]
+Description=Wifi (wpa_supplicant) on wlp1s0, started directly because netplan's own unit waits on a udev device unit that never becomes ready on this host
+After=systemd-udevd.service systemd-networkd.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/local/sbin/vhfwatch-wait-wlan.sh
+ExecStart=/usr/sbin/wpa_supplicant -i wlp1s0 -c /etc/wpa_supplicant/wlp1s0.conf
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

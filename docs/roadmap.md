@@ -108,9 +108,9 @@ The difference between a demo and something anyone should leave running.
 - [x] Daily end-to-end self-test including alert delivery — 2026-10-09; sent through the real outbox, so its arrival proves delivery works
 - [~] Disk space and queue-depth monitoring — disk-low alert built; queue overflow is counted and logged but does not alert
 - [ ] `GET /health` dashboard: last transmission, noise floor, queue depths, ASR latency, per-stage heartbeats
-- [~] `systemd` units for x86 Linux — written in `deploy/systemd/`, **untested on real hardware**
-- [ ] **Verify on x86 Linux with `faster-whisper`.** Do this before you've built much more; portability rot is easier to prevent than to fix.
-- [~] Runbook: `deploy/README.md` — written, not yet run on the target; ends with the recovery tests that are the real acceptance
+- [~] `systemd` units for x86 Linux — pipeline unit **proven on the HP mini 2026-10-20** (starts at boot, one process); web unit still untested; plus `vhfwatch-wifi.service` (D32)
+- [x] **Verify on x86 Linux with `faster-whisper`.** 2026-10-20 on the HP mini: model warmed in 2.8 s, capture and Telegram delivery work, floor -91.7 dBFS. A real transmission is still to come. Do this before you've built much more; portability rot is easier to prevent than to fix.
+- [~] Runbook: `deploy/README.md` — run on the target 2026-10-20, three traps fixed in it (section 0b); the recovery tests (section 8) are only partly done and are the real acceptance
 
 **Exit:** the system runs unattended for a week. Unplug the audio cable and it tells you within the configured window. It runs on x86 Linux, not just the Mac.
 

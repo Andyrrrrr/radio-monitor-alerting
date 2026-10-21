@@ -1548,3 +1548,48 @@ Telegram message delivered on the first attempt, no stalls or errors.
   Ubuntu Server 24.04 then deploy/README.md. Pipeline stopped for the day.
 
 ---
+
+### 2026-10-20 — the station host is installed, and it works (first run of deploy/README.md)
+
+Hardware: an HP EliteDesk 800 G3 Mini (Core i5, vPro, 3x DisplayPort, 4x USB-A, Ethernet),
+256 GB NVMe, Intel Wireless-AC 8265 (found with `lspci -nnk -s 01:00.0`, driver `iwlwifi`),
+Ubuntu Server 24.04.5, kernel 6.8. Installer written to a USB stick from the Mac with
+`dd` (4,080,486,400 bytes, checksum verified first). A borrowed monitor and keyboard were
+needed once, for the install.
+
+What went wrong, in order (details and fixes in `deploy/README.md` section 0b, decisions
+D31 and D32):
+- **Wifi through netplan failed** ("dependency job for netplan-wpa-wlp1s0.service
+  failed"; systemd timed out waiting for the device unit). The wired port was unusable
+  (restricted station network), so wifi was the only way. Worked around with a hand-started
+  `wpa_supplicant`, then made permanent as `vhfwatch-wifi.service`.
+- **A long red herring:** the first `scan_results` was empty, which looked like missing
+  antennas. It was just a slow first scan. The real fault was the name typed in lowercase
+  when the network's name is in capitals (say `stationnet` vs `STATIONNET`): wifi names are case-sensitive and `wpa_supplicant` sits on
+  `SCANNING` forever instead of saying so.
+- **The disk was encrypted** (LUKS ticked in the installer), so every boot waited for a
+  passphrase at the console and the host never came back after the first reboot test.
+  Fixed with a key file; verified by a reboot with nobody at the keyboard.
+- Passwordless `sudo` was enabled for the login user so the rest could be done over SSH.
+
+Measured on the host:
+- Quiet level **-91.7 dBFS** (calibrated -91.3 on the Mac rig): equivalent chain, thresholds
+  carried over unchanged. The UFO202 has no capture control on Linux (only `PCM`, playback).
+  `calibrate.py` ran during a transmission, so its suggested thresholds were ignored.
+- Wifi signal in the radio room: -56 dBm at 866 Mbps.
+- By hand: `asr.warmed_up` in 2.8 s (faster-whisper, model prefetched, 464 MB), capture
+  started, "started" and "daily check, alive" both reached Telegram on the first try, floor
+  -91.8 dBFS.
+- Installed as `vhfwatch-pipeline.service`; exactly one process; the service survived
+  being the thing that restarted after a reboot.
+
+Recovery tests (`deploy/README.md` section 8): a clean shutdown, power removed and
+restored, and a reboot with nobody at the keyboard all came back on their own. **Not yet
+done:** an abrupt power pull, unplugging the USB interface, a 5-minute wifi drop, radio
+off for six hours. Also not yet known: whether the BIOS powers the host on by itself after
+an AC loss (check with a hard pull; the setting is under Power-On Options, "After Power
+Loss").
+
+Not yet seen on the mini: a real transmission. The first one is the real end-to-end test.
+
+---

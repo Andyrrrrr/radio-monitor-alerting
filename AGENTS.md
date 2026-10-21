@@ -108,6 +108,7 @@ Each of these cost someone real time. Full reasoning is in the linked docs.
 - **Program marine channels as analog FM, 25 kHz wide.** The NX-5200 is a digital-capable radio; wrong mode or narrow bandwidth gives quiet, distorted audio and much worse transcription. (`docs/hardware.md` §2.2)
 - **Store Opus for archive, generate AAC/M4A at ingest for playback.** Opus-in-WebM is unreliable on iOS Safari and the users are on iPhones. Never transcode on demand in the request path. (`docs/architecture.md` §5.8)
 - **Use bounded queues.** If transcription falls behind, drop the _oldest unflagged_ segments loudly. Never block ingest; never drop something already flagged. (`docs/architecture.md` §3)
+- **Never let the host's disk be encrypted, and set wifi up by hand.** Ubuntu's installer offers LUKS; ticked, the host waits for a typed passphrase at every boot and is dead after a power cut. On the HP mini netplan's wifi unit also never starts (our own `vhfwatch-wifi.service` replaces it), and wifi names/passwords are case-sensitive: `wpa_cli ... scan_results` first. (`deploy/README.md` 0b, D31, D32)
 
 ## Out of scope for the POC
 

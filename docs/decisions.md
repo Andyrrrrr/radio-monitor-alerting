@@ -1071,3 +1071,76 @@ message does. Positions are logged (`position.found`) but not stored as rows.
 **Revisit when** the first real position call shows what the transcriber does with
 it, which will say whether the number-word handling needs to grow or shrink.
 
+
+### D30 addendum — 2026-10-17: the first real position call, and what it showed
+
+A Coast Guard urgent broadcast at 17:07 PT spoke a position. Two things stopped the map
+link, neither fixed yet (see `status.json` known_issues). (1) The broadcast opens with a
+26 s steady tone that Whisper wrote as "on, on, on, on, on, on", so the repeated-token
+gate rejected the whole transcript and position parsing never ran. (2) Even on the full
+text the parser found nothing: the numbers came out as comma-separated chunks
+(`4810, 701, 1224, 6, 707, 0, 2`, meaning 48 10.701 N plus a scrambled longitude),
+a shape the parser does not handle. It did correctly ignore a 10-digit phone number
+read out in another transmission. So the "number-word handling" question above is
+answered: it needs to grow, against real output, not synthetic.
+
+## D31 — The host's disk must unlock without a person at the keyboard
+
+**Decided 2026-10-20**, after the first real boot of the station host.
+
+**The problem.** The Ubuntu installer's Storage step offered LUKS disk encryption and it
+was ticked. Every boot then stopped at "Please unlock disk dm_crypt-0:" and waited for a
+passphrase typed at a console. A power cut, the commonest failure this host will meet,
+would leave it dead at that prompt indefinitely, with no notification, since the
+notifier is part of what never started. That is the silent-failure outcome AGENTS.md
+ranks worst.
+
+**What we did.** Kept the encryption but added a key file so the disk unlocks itself:
+`/etc/luks-keyfile` (root-only), a second LUKS key slot, `/etc/crypttab` pointing at it,
+`KEYFILE_PATTERN` plus `UMASK=0077` so the copy inside the startup image is mode 600,
+`update-initramfs`, and a verified reboot with nobody at the keyboard. The typed
+passphrase stays as a fallback slot, so a mistake cannot lock the operator out. The
+exact commands are in `deploy/README.md` section 0b.
+
+**The cost, stated plainly.** Anyone who takes the disk can read it: the key file's
+copy sits in `/boot`, which is not encrypted. On this host the disk holds a Telegram bot
+token and the station wifi password. That is inherent to any host that restarts
+unattended with encryption, not a bug. The channel carries only public Ch 16 traffic
+(the operator's scope decision in D26), and the bot token can be revoked from
+@BotFather if the host is ever lost.
+
+**Rejected:** a network unlock server (tang/clevis). Right for a larger shop; too many
+moving parts for a team of non-developers, and one more thing that must be up for the
+host to boot. **Also available, and cleaner:** reinstall without encryption. It costs
+about 40 minutes and a repeat of the wifi setup; we chose the key file to keep a
+working host. **Revisit when** the host is rebuilt: leave the box unticked and none of
+this is needed.
+
+## D32 — Wifi on the host is started by our own small service, not by netplan
+
+**Decided 2026-10-20.** On the HP mini (Intel 8265, kernel 6.8, Ubuntu Server 24.04.5)
+netplan's own wifi unit never started. `netplan apply` failed with a dependency error,
+the journal showed systemd timing out after 90 s waiting for the network device unit
+`sys-subsystem-net-devices-wlp1s0.device`, and that unit stayed `inactive (dead)` while
+udev reported the device correctly tagged. We did not find the cause: re-triggering
+udev, regenerating netplan and rebooting changed nothing, and a hand-started
+`wpa_supplicant` on the same interface worked first time.
+
+**What we did.** `deploy/systemd/vhfwatch-wifi.service` runs
+`wpa_supplicant -i wlp1s0` directly (after `deploy/vhfwatch-wait-wlan.sh` waits up to
+90 s for the adapter to appear at boot), with `Restart=always`, and
+`/etc/systemd/network/30-wifi.network` makes `systemd-networkd` ask for an address.
+Verified by a reboot, and by a clean shutdown, power removed, the host carried to
+another room and powered up there: it rejoined without help. An abrupt power pull has
+not been tried yet. Netplan is not used for wifi on this host.
+
+**The time sink worth remembering.** For hours the real fault looked like a
+broken adapter, then an empty scan looked like missing antennas. It was a typo: the
+network's name is in capitals and the file had it in lowercase (`STATIONNET` vs
+`stationnet`). Wifi names and passwords are
+case-sensitive, and `wpa_supplicant` reports `SCANNING` forever instead of saying "no
+such network". Always compare against `wpa_cli ... scan_results` first.
+
+**Revisit when** the cause of the dead device unit is found, or on a newer Ubuntu where
+netplan wifi works here; then the service can be deleted. A Realtek card would be a
+different story (D27 rule: Intel only).

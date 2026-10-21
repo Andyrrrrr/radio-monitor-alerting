@@ -4,10 +4,13 @@ Runbook for the unattended week-long run, written 2026-10-09 against the
 decisions in `docs/decisions.md` D24 (crash and restart), D26 (Telegram) and
 D27 (the N100 host).
 
-> **Status: written on a Mac, not yet run on real hardware.** Every command
-> below is from documentation, not from a session on the target. Expect to fix
-> something on first boot, and write what you fix back into this file — that is
-> the point of having it.
+> **Status: first run on real hardware, 2026-10-20** (HP EliteDesk 800 G3 Mini,
+> Core i5, Intel Wireless-AC 8265, Ubuntu Server 24.04.5). Sections 1-7 now work end
+> to end, but only after three fixes that are written into section 0b below. Section 8
+> (recovery tests) is **partly done**: a clean shutdown, power removed and restored,
+> and a reboot with nobody at the keyboard all came back on their own. Still to do: an
+> abrupt power pull, unplugging the USB interface, a 5-minute wifi drop, and radio-off.
+> Write what you fix back into this file; that is the point of having it.
 
 The design in one paragraph: the pipeline **exits non-zero** whenever capture
 stalls or a stage hangs (D24), and **systemd restarts it**. There is no
@@ -36,6 +39,96 @@ antenna leads, so a Realtek card can be swapped for an Intel 8265 for roughly
 $10-15. Check that the antenna leads are actually connected, or the signal will be
 poor. Details and the questions to ask a seller are in `docs/decisions.md` (D27
 addendum).
+
+## 0b. Installing Ubuntu on the host: three traps (found 2026-10-20)
+
+Each cost hours. They are in the order you will meet them.
+
+**Trap 1: do NOT encrypt the disk.** The installer's Storage step has an "Encrypt the
+LVM group with LUKS" tick-box. If it is ticked, the host stops at **"Please unlock
+disk dm_crypt-0:"** on every boot and waits for a person. After a power cut the host
+is then dead, and nothing tells anyone: the exact silent failure this project exists
+to prevent (D31). Leave it unticked.
+
+*If it was already ticked*, make the disk unlock itself with a key file (the typed
+passphrase keeps working as a fallback, so a mistake cannot lock you out). On a
+standard Ubuntu LUKS install `/boot` is a separate unencrypted partition and the
+encrypted device is `nvme0n1p3`; confirm with `lsblk -f`:
+
+```bash
+sudo dd if=/dev/urandom of=/etc/luks-keyfile bs=512 count=8 status=none
+sudo chmod 0400 /etc/luks-keyfile
+sudo cryptsetup luksAddKey /dev/nvme0n1p3 /etc/luks-keyfile      # asks for the passphrase
+sudo cp /etc/crypttab /etc/crypttab.orig
+sudo sed -i -E 's#^(dm_crypt-0 UUID=[^ ]+) none luks#\1 /etc/luks-keyfile luks#' /etc/crypttab
+echo 'KEYFILE_PATTERN="/etc/luks-keyfile"' | sudo tee -a /etc/cryptsetup-initramfs/conf-hook
+echo 'UMASK=0077' | sudo tee -a /etc/initramfs-tools/initramfs.conf
+sudo update-initramfs -u -k all
+sudo lsinitramfs /boot/initrd.img-$(uname -r) | grep cryptroot/keyfiles   # must print a line
+sudo reboot                                                       # must come back with no keyboard
+```
+
+The tradeoff is real: anyone holding the disk can read it (it will hold the Telegram
+token and the wifi password). That is unavoidable for a host that must restart
+unattended, and the channel carries only public Ch 16 traffic.
+
+**Trap 2: wifi through netplan does not work on this host.** `netplan apply` failed
+with *"A dependency job for netplan-wpa-wlp1s0.service failed"*. The journal said
+systemd timed out waiting for `sys-subsystem-net-devices-wlp1s0.device`, which stayed
+`inactive (dead)` even though udev tagged the device correctly (cause not found).
+Re-triggering udev and rebooting did not help. The fix is to skip netplan for wifi and
+start `wpa_supplicant` ourselves:
+
+1. Write `/etc/wpa_supplicant/wlp1s0.conf` (mode 600). **The wifi name and password
+   are case-sensitive**; copy the name exactly as `scan_results` prints it:
+
+   ```
+   ctrl_interface=DIR=/run/wpa_supplicant GROUP=netdev
+   update_config=1
+   country=US
+   network={
+     ssid="EXACT NAME"
+     psk="PASSWORD"
+   }
+   ```
+
+2. Write `/etc/systemd/network/30-wifi.network` so networkd asks for an address:
+
+   ```
+   [Match]
+   Name=wlp1s0
+
+   [Network]
+   DHCP=yes
+   ```
+
+3. Start it by hand the first time (the repo is not on the host yet, no network):
+   `sudo wpa_supplicant -B -i wlp1s0 -c /etc/wpa_supplicant/wlp1s0.conf`, then
+   `sudo systemctl restart systemd-networkd`. Check `ip -br addr`.
+4. Once the repo is cloned, make it permanent:
+
+   ```bash
+   sudo install -m 755 deploy/vhfwatch-wait-wlan.sh /usr/local/sbin/
+   sudo cp deploy/systemd/vhfwatch-wifi.service /etc/systemd/system/
+   sudo systemctl daemon-reload && sudo systemctl enable vhfwatch-wifi
+   ```
+
+   It waits up to 90 s for the adapter to appear at boot. Proven: after a reboot the
+   host rejoined the wifi in under a minute with nobody at the keyboard.
+
+Debugging aids: `sudo wpa_cli -i wlp1s0 status` (`SCANNING` forever means the name or
+password does not match what the network advertises; compare `scan_results`),
+`list_networks`, `scan` then `scan_results`. **An empty `scan_results` straight after
+start is normal**; the first scan has not run. `rfkill` is not installed by default;
+`cat /sys/class/rfkill/rfkill*/state` prints 1 for "not blocked". An Ethernet cable
+did nothing here: the station's wired ports are restricted, so setup was over wifi.
+
+**Trap 3: setting up remote access.** The first boot needs a monitor and keyboard.
+After that, from the laptop: `ssh-copy-id -i ~/.ssh/<key>.pub <user>@<host>`, then
+passwordless `sudo` for that user so the rest can be scripted
+(`echo "<user> ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/90-<user>`). That is
+a judgment call: whoever holds the key has root on the host. Acceptable for a
+single-purpose box on a private network; remove it with `sudo rm` that file.
 
 ## 1. System packages and user
 
@@ -113,6 +206,15 @@ paste new thresholds over a changed chain.
 
 **The UFO202's LINE/PHONO switch must be on LINE** (`docs/hardware.md` §3.2).
 
+Measured 2026-10-20 on the HP mini: the UFO202 exposes **no capture control** on Linux
+(`amixer -c CODEC scontrols` lists only `PCM`, which is playback), so there is nothing
+to adjust, and the floor came out at **-91.7 dBFS** against -91.3 on the Mac, so the
+thresholds carried over unchanged. Two traps: `arecord -l` as your login user prints
+"no soundcards found" because you are not in the `audio` group, so run it as the
+service user (`sudo -u vhfwatch arecord -l`); and if a transmission lands during
+`calibrate.py`, its "suggested" thresholds are contaminated (the loudest idle window
+jumps to about -24 dBFS). Keep the existing thresholds and re-run on an idle channel.
+
 ## 5. Secrets
 
 ```bash
@@ -176,6 +278,9 @@ the test — fix it before the week starts.
 | No Telegram messages, no errors | Env file not read: `systemctl show vhfwatch-pipeline -p EnvironmentFiles`; plain `KEY=value`, no `export` |
 | `alert.telegram_failed … 401` | Wrong token. Not retried, by design — a bad token fails identically forever |
 | `alert.telegram_failed … 400` | Wrong chat id, or the bot was never messaged (it cannot message you first) |
+| After a reboot the host never comes back, and a monitor shows "Please unlock disk" | The disk was installed encrypted (0b, trap 1) |
+| `netplan apply`: "dependency job for netplan-wpa-wlp1s0.service failed" | netplan's wifi unit does not work here (0b, trap 2) |
+| `wpa_cli status` stuck on `SCANNING` | Wifi name or password does not match exactly; names and passwords are case-sensitive |
 | One "daily check" every day at `self_test_hour`, none on a quiet day | Working as designed; the check is the proof of life |
 
 ## Updating
@@ -185,7 +290,8 @@ cd /opt/vhfwatch
 sudo -u vhfwatch git pull
 sudo -u vhfwatch .venv/bin/pip install -e ".[linux]"
 sudo systemctl restart vhfwatch-pipeline
-pgrep -fc 'vhfwatch.pipeline'      # must print 1
+systemctl show -p MainPID --value vhfwatch-pipeline   # one PID, not 0
+# (pgrep -fc 'vhfwatch.pipeline' over ssh prints 2: it counts its own command line)
 ```
 
 ## Remote access

@@ -52,3 +52,6 @@ dist/
 
 # macOS
 .DS_Store
+
+# Per-user Claude Code permission rules (can grant broad SSH access) - never commit
+.claude/settings.local.json
