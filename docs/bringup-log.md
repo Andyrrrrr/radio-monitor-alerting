@@ -1590,6 +1590,13 @@ off for six hours. Also not yet known: whether the BIOS powers the host on by it
 an AC loss (check with a hard pull; the setting is under Power-On Options, "After Power
 Loss").
 
-Not yet seen on the mini: a real transmission. The first one is the real end-to-end test.
+**2026-10-21, the first real transmissions on the mini** (a Victoria Coast Guard call and a
+short fragment): captured and transcribed correctly, but Telegram delivery failed on the
+recordings: `alert.telegram_failed detail= method=sendAudio`, the outbox started retrying.
+Small messages worked, large ones hung. MTU test by hand: 1500 and 1400 hung, 1300 worked
+(HTTP 200 in 5 s). Set `MTUBytes=1300` in the wifi `.network` file; the outbox then delivered
+both queued messages (235 s and 180 s late, none abandoned). This was the first real
+exercise of the retry design and it held. Trap 4 in `deploy/README.md` 0b. The mini's
+clock is UTC, so its live feed shows UTC; the app's own display timezone is Los Angeles.
 
 ---

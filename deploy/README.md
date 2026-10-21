@@ -40,9 +40,9 @@ $10-15. Check that the antenna leads are actually connected, or the signal will 
 poor. Details and the questions to ask a seller are in `docs/decisions.md` (D27
 addendum).
 
-## 0b. Installing Ubuntu on the host: three traps (found 2026-10-20)
+## 0b. Installing Ubuntu on the host: four traps (found 2026-10-20 and 21)
 
-Each cost hours. They are in the order you will meet them.
+Each cost hours. Traps 1-3 are in the order you will meet them; trap 4 only shows on the first real transmission.
 
 **Trap 1: do NOT encrypt the disk.** The installer's Storage step has an "Encrypt the
 LVM group with LUKS" tick-box. If it is ticked, the host stops at **"Please unlock
@@ -98,9 +98,14 @@ start `wpa_supplicant` ourselves:
    [Match]
    Name=wlp1s0
 
+   [Link]
+   MTUBytes=1300
+
    [Network]
    DHCP=yes
    ```
+
+   (`MTUBytes=1300` is trap 4 below; without it recordings never reach Telegram.)
 
 3. Start it by hand the first time (the repo is not on the host yet, no network):
    `sudo wpa_supplicant -B -i wlp1s0 -c /etc/wpa_supplicant/wlp1s0.conf`, then
@@ -129,6 +134,18 @@ passwordless `sudo` for that user so the rest can be scripted
 (`echo "<user> ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/90-<user>`). That is
 a judgment call: whoever holds the key has root on the host. Acceptable for a
 single-purpose box on a private network; remove it with `sudo rm` that file.
+
+**Trap 4: the station network drops full-size packets, so Telegram recordings hang.**
+Found 2026-10-21 on the first real transmission. `alert.telegram_failed detail=` (the
+detail is empty, a timeout) with `method=sendAudio`, while small messages (the
+"started" notice, `sendMessage`) went through. By hand,
+`curl -F audio=@file.opus .../sendAudio` connected in 0.2 s and then crawled at about
+100 B/s until it timed out. Lowering the wifi MTU fixed it: **1500 and 1400 hung, 1300
+worked**. `MTUBytes=1300` in `/etc/systemd/network/30-wifi.network` makes it permanent
+(check `cat /sys/class/net/wlp1s0/mtu`). The outbox did its job: both queued messages
+arrived on retry (235 s and 180 s late) and nothing was abandoned. Test any new network
+with a real upload, not just a `curl` of a web page, and do not trust `ping`: the
+station network drops it. The laptop never showed this because it is a different path.
 
 ## 1. System packages and user
 
@@ -280,6 +297,7 @@ the test — fix it before the week starts.
 | `alert.telegram_failed … 400` | Wrong chat id, or the bot was never messaged (it cannot message you first) |
 | After a reboot the host never comes back, and a monitor shows "Please unlock disk" | The disk was installed encrypted (0b, trap 1) |
 | `netplan apply`: "dependency job for netplan-wpa-wlp1s0.service failed" | netplan's wifi unit does not work here (0b, trap 2) |
+| `alert.telegram_failed detail= method=sendAudio`, small notices still arrive | The network drops full-size packets; wifi MTU 1300 (0b, trap 4) |
 | `wpa_cli status` stuck on `SCANNING` | Wifi name or password does not match exactly; names and passwords are case-sensitive |
 | One "daily check" every day at `self_test_hour`, none on a quiet day | Working as designed; the check is the proof of life |
 
