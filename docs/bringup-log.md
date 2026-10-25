@@ -1547,6 +1547,20 @@ Telegram message delivered on the first attempt, no stalls or errors.
   the wifi card name (Device Manager), and a borrowed monitor and keyboard. Plan is
   Ubuntu Server 24.04 then deploy/README.md. Pipeline stopped for the day.
 
+### 2026-10-25, silent transmissions deployed to the station host (D33)
+
+Pulled `parker-hardware-setup` on the host (`/opt/vhfwatch`, fast-forward, now at
+`43bad08`) and restarted `vhfwatch-pipeline`. Commands as in `deploy/README.md`
+"Updating"; the repo there is owned by `vhfwatch`, so git runs as `sudo -u vhfwatch`
+(plain `git` as the login user fails with "dubious ownership"). One process, no errors:
+`asr.warmed_up` in 2.7 s, capture started on `USB Audio CODEC` at 48 kHz, `use_channel=0`,
+and the "started" notice reached Telegram. Listening was down for about 5 s. The pull also
+brought in the D32 wifi unit files; they sit on disk and were not installed by this update.
+
+**Not yet verified live:** that a real transmission arrives silently and an URGENT incident
+still rings. No private test chat exists yet to try the urgent case without alerting the
+captains.
+
 ---
 
 ### 2026-10-20 — the station host is installed, and it works (first run of deploy/README.md)
