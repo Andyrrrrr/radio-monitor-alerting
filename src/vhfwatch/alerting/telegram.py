@@ -88,14 +88,18 @@ class TelegramAlertChannel:
         Falls back to text if the file is missing — a transcript with no
         audio still beats no notification at all.
         """
+        # Delivered quietly by default: every transmission lands here, and
+        # only incident alerts (`send`) are meant to ring the phone.
+        silent = self._cfg.silent_transmissions
         if audio is None or not audio.exists():
             logger.warning("alert.telegram_audio_missing", path=str(audio))
             return await self._call(
-                "sendMessage", data={"text": caption[:_MAX_MESSAGE]}
+                "sendMessage",
+                data={"text": caption[:_MAX_MESSAGE], "disable_notification": silent},
             )
         return await self._call(
             "sendAudio",
-            data={"caption": caption[:_MAX_CAPTION]},
+            data={"caption": caption[:_MAX_CAPTION], "disable_notification": silent},
             files={"audio": (audio.name, audio.read_bytes())},
         )
 

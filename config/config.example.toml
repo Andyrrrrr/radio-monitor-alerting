@@ -185,6 +185,11 @@ dedupe_window_s   = 300
 # Secrets are env-only: VHFWATCH_TELEGRAM_TOKEN, VHFWATCH_TELEGRAM_CHAT_ID
 timeout_s     = 15.0   # audio upload, not just a text POST
 silent_health = true   # health notices arrive without a sound
+# Every transmission arrives without a sound, so captains can read all traffic
+# but only incident alerts (channels_critical / channels_urgent) ring the phone.
+# Set false to make every transmission ring. Telegram applies this per message;
+# a chat muted on the phone silences the alerts too, so leave it unmuted.
+silent_transmissions = true
 
 [alerting.pushover]
 priority_critical = 2          # emergency: bypasses DND, re-alerts until acked

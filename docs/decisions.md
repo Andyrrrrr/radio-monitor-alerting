@@ -1144,3 +1144,24 @@ such network". Always compare against `wpa_cli ... scan_results` first.
 **Revisit when** the cause of the dead device unit is found, or on a newer Ubuntu where
 netplan wifi works here; then the service can be deleted. A Realtek card would be a
 different story (D27 rule: Intel only).
+
+## D33 — Per-transmission Telegram messages are silent; only incident alerts ring
+
+**Decided 2026-10-25.** Captains want to be able to read all Ch 16 traffic in Telegram
+but have their phone sound only when the program is confident something is wrong.
+Telegram has no setting that filters notifications by message content (its controls
+are per chat), so the program decides instead: `send_audio` (every transmission) sets
+the Bot API's `disable_notification`, while `send` (incident alerts) does not. Config:
+`[alerting.telegram].silent_transmissions`, default `true`.
+
+**What rings is unchanged:** only incidents routed by `channels_critical` and
+`channels_urgent`. WATCH goes to the console only, in keeping with the bias toward
+fewer false positives. The LLM never gates a ring (AGENTS.md constraint 6).
+
+**Limits:** the flag is per message, so a chat muted on the phone silences the alerts
+too; captains must leave the chat unmuted. Telegram cannot break through iPhone Do Not
+Disturb or Focus. Both belong in whatever is said to captains.
+
+**Rejected:** two chats (all traffic / alerts only). More reliable against muting, but
+one more chat ID, one more thing to explain, and a second send path. **Revisit when**
+captains mute the chat and miss alerts: the two-chat split is the fix.

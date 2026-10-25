@@ -3,10 +3,12 @@ dedupe, channel-failure isolation, and the offline-complete body."""
 
 import asyncio
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from vhfwatch.alerting.base import format_body, format_title
 from vhfwatch.alerting.router import AlertRouter
-from vhfwatch.config import AlertingConfig
+from vhfwatch.alerting.telegram import TelegramAlertChannel
+from vhfwatch.config import AlertingConfig, TelegramConfig
 from vhfwatch.models import AlertResult, Incident, IncidentSummary, Severity, new_id
 
 T0 = datetime(2026, 8, 10, 19, 30, 0, tzinfo=UTC)
@@ -167,3 +169,49 @@ def test_watch_routes_to_no_channels_quietly() -> None:
     inc = make_incident(severity=Severity.WATCH)
     results = asyncio.run(router.dispatch(inc, is_new=True, escalated=False))
     assert results == []
+
+
+class _CapturingTelegram(TelegramAlertChannel):
+    """Telegram channel that records the request instead of sending it."""
+
+    def __init__(self, cfg: TelegramConfig) -> None:
+        super().__init__(cfg, "UTC", lambda _incident: None)
+        self.calls: list[tuple[str, dict[str, object]]] = []
+
+    async def _call(
+        self,
+        method: str,
+        *,
+        data: dict[str, object],
+        files: dict[str, tuple[str, bytes]] | None = None,
+    ) -> AlertResult:
+        self.calls.append((method, data))
+        return AlertResult(channel=self.name, ok=True)
+
+
+def test_transmissions_are_silent_but_incident_alerts_ring(tmp_path: Path) -> None:
+    """Captains read all traffic but are only pinged when the detector flags
+    something: recordings go out silent, incident alerts do not."""
+    audio = tmp_path / "tx.m4a"
+    audio.write_bytes(b"x")
+    channel = _CapturingTelegram(TelegramConfig())
+
+    asyncio.run(channel.send_audio(audio, "ch 16 · routine chatter"))
+    asyncio.run(channel.send_audio(None, "ch 16 · audio file missing"))
+    asyncio.run(channel.send(make_incident(), is_update=False))
+
+    audio_call, fallback_call, incident_call = channel.calls
+    assert audio_call[0] == "sendAudio"
+    assert audio_call[1]["disable_notification"] is True
+    assert fallback_call[1]["disable_notification"] is True
+    assert "disable_notification" not in incident_call[1]
+
+
+def test_silent_transmissions_can_be_switched_off(tmp_path: Path) -> None:
+    audio = tmp_path / "tx.m4a"
+    audio.write_bytes(b"x")
+    channel = _CapturingTelegram(TelegramConfig(silent_transmissions=False))
+
+    asyncio.run(channel.send_audio(audio, "ch 16"))
+
+    assert channel.calls[0][1]["disable_notification"] is False

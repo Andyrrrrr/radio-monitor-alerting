@@ -204,6 +204,10 @@ class TelegramConfig(_Section):
 
     timeout_s: float = 15.0  # audio upload, not just a text POST
     silent_health: bool = True  # health notices arrive without a sound
+    # Per-transmission recordings arrive without a sound. Only incident alerts
+    # (CRITICAL/URGENT) ring, so a captain can read all traffic yet be pinged
+    # only when the detector flags something (docs/decisions.md D33).
+    silent_transmissions: bool = True
 
 
 class AlertingConfig(_Section):
