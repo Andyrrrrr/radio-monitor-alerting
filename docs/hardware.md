@@ -377,6 +377,68 @@ images, not text — if a number here is ever in doubt, that is where to settle 
 
 ---
 
+### 3.10 Speaker on/off switch for the station radio (PLANNED, not yet installed)
+
+**Why.** The MCS 2000 is programmed with a minimum volume, so turning the knob fully
+left still leaves the external speaker audible. The operator wants it silent at night
+and on during the day, with a switch they can flip by hand.
+
+**Why it is safe for the program.** The audio tap is pin 11 FIL AUD OUT on the
+accessory connector, which is taken **before** the volume control and has nothing to do
+with the speaker (section 3.9). A switch in the speaker's own two wires cannot change
+what the pipeline hears. Confirm afterwards anyway (last step).
+
+**What to build: one SPST on/off switch in series with one of the speaker's two wires.**
+Closed = speaker plays; open = silent. An open speaker line is harmless to the radio's
+audio amplifier. **Never short the two wires together.** Which of the two wires you cut
+does not matter and polarity does not matter.
+
+**Optional instead: an inline speaker volume control (an "L-pad")**, for something
+between on and off. Read the speaker's label first for its impedance (commonly 8 ohm)
+and wattage and buy a matching L-pad. More wiring (three or four terminals); only
+worth it if on/off is not enough.
+
+**Parts (all cheap; check stock and price yourself).** Search terms:
+
+- *"SPST toggle switch 3A"* or *"inline rocker switch 2 wire"*; any switch rated 2-3 A or
+  more is far above what a speaker draws. A model with **screw terminals** means no
+  soldering.
+- *"Wago 221 lever nuts"* or *"heat shrink butt connectors 18-22 AWG"* if the switch has
+  loose wires instead of screw terminals.
+- *"heat shrink tubing assortment"* and a few zip ties; a label or tape to mark it
+  SPEAKER.
+- Tools: wire cutters/strippers; a soldering iron only if you choose to solder; a
+  multimeter with continuity beep is nice to have.
+
+**Steps.**
+
+1. Leave the radio **on, on Ch 16**, and leave the mini running. Nothing here touches
+   the radio's accessory connector, so the program keeps hearing and sending.
+2. If the speaker cable plugs into the radio, **unplug it first**. If it is hard-wired,
+   fine; just keep the two wires apart.
+3. The speaker cable is two thin conductors in one jacket, like lamp cord. Split them
+   about 4 inches by gently pulling them apart.
+4. Cut **one** conductor in the middle only. Leave the other whole. Strip about 1/4 inch
+   from each cut end.
+5. Connect the two cut ends to the switch's two terminals, either way round. Tighten the
+   screws or use the lever nuts; **tug each wire**. Cover any bare metal.
+6. Check nothing bare can touch the other conductor. Zip-tie the switch to the cable and
+   label it.
+7. Plug the speaker back in. Test: with a multimeter on continuity, the switch beeps
+   when on and not when off; or wait for the next call and listen with the switch on,
+   then off.
+8. **Prove the program is unaffected.** The next transmission must still arrive in
+   Telegram with its recording, and the 9 AM "daily check" noise floor must still read
+   about -91.7 dBFS.
+
+**Do not**: touch the radio's accessory connector or the audio pins; change the radio's
+channel or switch it off; reprogram it (the minimum-volume setting is in the radio's
+programming and changing it needs a programming cable and is not worth the risk); or
+leave the speaker switched off without telling the room, since nobody will hear Ch 16
+live (Telegram still gets everything).
+
+**Rollback**: take the switch out and rejoin the cut wire.
+
 ## 4. The antenna problem — set expectations honestly
 
 **A handheld with a rubber-duck antenna on a desk indoors will hear very little marine traffic.** VHF is line-of-sight and range scales with antenna height. A stock portable antenna at desk height inside a building may hear only strong nearby stations.
