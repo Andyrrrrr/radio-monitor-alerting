@@ -16,6 +16,10 @@ false positives beats maximum recall; a missed detection has other paths):
   "We are NOT taking on water" matches a watchword the LLM can correctly
   dismiss — but the detection row stays visible for corpus review rather
   than disappearing.
+- **Out-of-area speakers cap at WATCH.** A call that names e.g. "Victoria
+  Coast Guard" is too far for the fire boat to answer, so it cannot ring the
+  phone. Like the LLM demotion it stays visible, never dropped; it only ever
+  lowers severity.
 """
 
 from datetime import UTC, datetime
@@ -24,7 +28,7 @@ import structlog
 
 from vhfwatch.config import DetectConfig
 from vhfwatch.detect.classify import Classifier, LLMAssessment
-from vhfwatch.detect.watchwords import WatchwordHit, WatchwordMatcher
+from vhfwatch.detect.watchwords import WatchwordHit, WatchwordMatcher, normalize
 from vhfwatch.models import Detection, Severity, Transcript, new_id
 
 logger = structlog.get_logger(__name__)
@@ -58,6 +62,16 @@ class Detector:
         self._cfg = cfg
         self._matcher = matcher
         self._classifier = classifier
+        self._out_of_area = [normalize(p) for p in cfg.out_of_area_phrases]
+
+    def _out_of_area_phrase(self, text: str) -> str | None:
+        """The first configured out-of-area phrase in `text`, word-bounded
+        (same padding as the watchword exact pass)."""
+        padded = f" {normalize(text)} "
+        for phrase in self._out_of_area:
+            if phrase and f" {phrase} " in padded:
+                return phrase
+        return None
 
     async def detect(
         self, transcript: Transcript, context: list[str] | None = None
@@ -79,6 +93,16 @@ class Detector:
             assessment = await self._classifier.classify(transcript.text, context)
 
         severity, confidence = self._resolve(hits, assessment)
+
+        out_of_area = self._out_of_area_phrase(transcript.text)
+        if out_of_area is not None and _RANK[severity] > _RANK[Severity.WATCH]:
+            logger.info(
+                "detection.demoted_out_of_area",
+                transmission_id=transcript.transmission_id,
+                phrase=out_of_area,
+                from_severity=severity.value,
+            )
+            severity = Severity.WATCH
 
         if not hits and (assessment is None or assessment.severity == "routine"):
             return None

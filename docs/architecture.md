@@ -379,6 +379,8 @@ Requirements:
 | WATCH | partial/fuzzy match only, or LLM confidence below threshold |
 | ROUTINE | everything else |
 
+**Out-of-area cap (D34):** a transcript naming a phrase in `[detect] out_of_area_phrases` (default Victoria Coast Guard / Victoria traffic) is capped at WATCH after the table above is applied. Lowers only; never drops.
+
 Watchwords live in `config/watchwords.toml`, fully user-editable, grouped by severity. Starting set:
 
 ```toml

@@ -1165,3 +1165,34 @@ Disturb or Focus. Both belong in whatever is said to captains.
 **Rejected:** two chats (all traffic / alerts only). More reliable against muting, but
 one more chat ID, one more thing to explain, and a second send path. **Revisit when**
 captains mute the chat and miss alerts: the two-chat split is the fix.
+
+## D34 — Calls that name an out-of-area station are capped at WATCH
+
+**Decided 2026-11-02**, at the operator's request. The station hears Ch 16 traffic from
+Victoria and Seattle that the fire boat cannot respond to, and those calls were ringing
+the phone as URGENT.
+
+**What it does.** `[detect] out_of_area_phrases` (default `["victoria coast guard",
+"victoria traffic"]`) is matched against each transcript, as whole words on normalized
+text. A hit lowers the detection's severity to WATCH if it was higher. WATCH routes to
+the console only, so the phone does not ring.
+
+**What it does not do.** It never drops anything: the detection row, the matched terms
+and the silent per-transmission Telegram message all remain, and the log line
+`detection.demoted_out_of_area` records the phrase and the original severity. It only
+ever lowers severity, the same shape as the LLM demotion in the detector docstring.
+
+**Chosen on real data.** Whisper wrote the calls as "Victoria Coast Guard radio",
+"Victoria Coast Guard" and "Victoria traffic" in all twelve transcripts on the
+2026-10-20 copy of the database, so no fuzzy matching was needed. Two of the three
+URGENT detections in that copy were Victoria pan-pans and would have been WATCH.
+
+**The judgment call.** A phrase, not the word "Victoria": a vessel named Victoria in
+trouble nearby must still ring (there is a test). The cost, stated plainly: a US Coast
+Guard call that merely *names* Victoria Coast Guard, for example relaying a local
+vessel, is demoted too, and so is a Canadian call about a vessel near the San Juans.
+Both stay visible in the silent Telegram stream. If one of those turns out to matter,
+the fix is an in-area override from place-name tagging, not removing this rule.
+
+**Revisit when** place-name tagging exists (it can override this for in-area places),
+or when the log shows a demoted call that should have rung.
