@@ -20,14 +20,26 @@ false positives beats maximum recall; a missed detection has other paths):
   Coast Guard" is too far for the fire boat to answer, so it cannot ring the
   phone. Like the LLM demotion it stays visible, never dropped; it only ever
   lowers severity.
+- **Strict urgent gate (D35, opt-in via `strict_urgent`).** CRITICAL/URGENT
+  survives only when an exact mayday/pan-pan watchword, a Coast Guard speaker
+  phrase and an in-territory place name are ALL in the transcript. Anything
+  else rates WATCH. This knowingly trades missed calls (a kayaker, a fishing
+  boat) for fewer rings.
+  One exception raises severity back: a Coast Guard mayday/pan-pan held for
+  lacking a place becomes an "anchor" for `strict_window_s`; a later Coast
+  Guard transmission that names an in-zone place escalates it. The Coast
+  Guard often opens, pauses, then gives the place.
 """
 
-from datetime import UTC, datetime
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 import structlog
 
 from vhfwatch.config import DetectConfig
 from vhfwatch.detect.classify import Classifier, LLMAssessment
+from vhfwatch.detect.places import PlaceMatcher
 from vhfwatch.detect.watchwords import WatchwordHit, WatchwordMatcher, normalize
 from vhfwatch.models import Detection, Severity, Transcript, new_id
 
@@ -55,14 +67,70 @@ def _tier1_severity(hits: list[WatchwordHit]) -> Severity:
     return severity
 
 
+@dataclass
+class _Anchor:
+    """A Coast Guard mayday/pan-pan held at WATCH only for want of a place."""
+
+    at: datetime
+    severity: Severity
+    confidence: float
+    terms: list[str]
+    transmission_id: str
+
+
 class Detector:
     def __init__(
-        self, cfg: DetectConfig, matcher: WatchwordMatcher, classifier: Classifier
+        self,
+        cfg: DetectConfig,
+        matcher: WatchwordMatcher,
+        classifier: Classifier,
+        places: PlaceMatcher | None = None,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
+        if cfg.strict_urgent and places is None:
+            # Without place lists the gate would mute every alert silently.
+            raise ValueError("strict_urgent needs a PlaceMatcher")
+        self._places = places
         self._cfg = cfg
         self._matcher = matcher
         self._classifier = classifier
         self._out_of_area = [normalize(p) for p in cfg.out_of_area_phrases]
+        self._call_terms = {normalize(t) for t in cfg.urgent_call_terms}
+        self._speakers = [normalize(p) for p in cfg.urgent_speaker_phrases]
+        self._window = timedelta(seconds=cfg.strict_window_s)
+        self._anchors: list[_Anchor] = []
+        # Same wall clock the correlator uses (Detection.created_at); injectable
+        # so the window can be tested without sleeping.
+        self._clock = clock or (lambda: datetime.now(UTC))
+
+    def _strict_gate_failure(self, text: str, hits: list[WatchwordHit]) -> str | None:
+        """Why this transcript may not ring under the strict gate, or None if
+        it passes (a Coast Guard mayday/pan-pan naming an in-zone place)."""
+        if not any(h.kind == "exact" and h.term in self._call_terms for h in hits):
+            return "no_mayday_or_pan_pan"
+        if not self._coast_guard_speaks(text):
+            return "not_coast_guard"
+        assert self._places is not None
+        if not self._places.find(text).in_territory:
+            return "no_in_territory_place"
+        return None
+
+    def _coast_guard_speaks(self, text: str) -> bool:
+        padded = f" {normalize(text)} "
+        return any(f" {p} " in padded for p in self._speakers)
+
+    def _anchor_to_escalate(self, text: str) -> _Anchor | None:
+        """The held pan-pan this transcript completes: a Coast Guard
+        transmission, not from an out-of-area station, naming an in-zone place
+        while an anchor is still inside the window. Highest severity wins."""
+        if not self._anchors or self._out_of_area_phrase(text) is not None:
+            return None
+        if not self._coast_guard_speaks(text):
+            return None
+        assert self._places is not None
+        if not self._places.find(text).in_territory:
+            return None
+        return max(self._anchors, key=lambda a: _RANK[a.severity])
 
     def _out_of_area_phrase(self, text: str) -> str | None:
         """The first configured out-of-area phrase in `text`, word-bounded
@@ -82,6 +150,7 @@ class Detector:
         passed through to the LLM (a lone 4-second clip is often
         uninterpretable).
         """
+        now = self._clock()
         hits = self._matcher.match(transcript.text)
 
         # Tier 2 runs on any Tier 1 hit, or on longer transcripts even with
@@ -104,21 +173,70 @@ class Detector:
             )
             severity = Severity.WATCH
 
-        if not hits and (assessment is None or assessment.severity == "routine"):
-            return None
-        if severity is Severity.ROUTINE and not hits:
+        escalation: _Anchor | None = None
+        if self._cfg.strict_urgent:
+            self._anchors = [a for a in self._anchors if now - a.at <= self._window]
+            if _RANK[severity] > _RANK[Severity.WATCH]:
+                reason = self._strict_gate_failure(transcript.text, hits)
+                if reason is not None:
+                    assert self._places is not None
+                    mentions = self._places.find(transcript.text)
+                    logger.info(
+                        "detection.demoted_strict_urgent",
+                        transmission_id=transcript.transmission_id,
+                        reason=reason,
+                        from_severity=severity.value,
+                        matched_terms=[h.term for h in hits],
+                        out_of_territory=list(mentions.out_of_territory),
+                        edge=list(mentions.edge),
+                    )
+                    if reason == "no_in_territory_place":
+                        # A Coast Guard pan-pan waiting for its place.
+                        self._anchors.append(
+                            _Anchor(
+                                at=now,
+                                severity=severity,
+                                confidence=confidence,
+                                terms=[h.term for h in hits],
+                                transmission_id=transcript.transmission_id,
+                            )
+                        )
+                    severity = Severity.WATCH
+            escalation = self._anchor_to_escalate(transcript.text)
+
+        matched_terms = [h.term for h in hits]
+        tier = "both" if hits and assessment else ("watchword" if hits else "llm")
+        if escalation is not None and _RANK[escalation.severity] > _RANK[severity]:
+            assert self._places is not None
+            logger.info(
+                "detection.window_escalation",
+                transmission_id=transcript.transmission_id,
+                anchor_transmission_id=escalation.transmission_id,
+                anchor_age_s=round((now - escalation.at).total_seconds()),
+                severity=escalation.severity.value,
+                places=list(self._places.find(transcript.text).in_territory),
+            )
+            severity = escalation.severity
+            confidence = max(confidence, escalation.confidence)
+            matched_terms += [t for t in escalation.terms if t not in matched_terms]
+            tier = "window"
+            self._anchors = []  # one escalation per held pan-pan
+        elif not hits and (
+            assessment is None
+            or assessment.severity == "routine"
+            or severity is Severity.ROUTINE
+        ):
             return None
 
-        tier = "both" if hits and assessment else ("watchword" if hits else "llm")
         detection = Detection(
             id=new_id(),
             transmission_id=transcript.transmission_id,
             severity=severity,
             confidence=confidence,
-            matched_terms=[h.term for h in hits],
+            matched_terms=matched_terms,
             tier=tier,
             classifier_output=assessment.model_dump() if assessment else None,
-            created_at=datetime.now(UTC),
+            created_at=now,
         )
         logger.info(
             "detection.created",

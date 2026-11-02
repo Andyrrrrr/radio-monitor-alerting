@@ -59,6 +59,7 @@ from vhfwatch.config import Settings, load_config
 from vhfwatch.detect import (
     Classifier,
     Detector,
+    PlaceMatcher,
     WatchwordMatcher,
     gate_transcript,
     gate_transmission,
@@ -163,7 +164,8 @@ async def run(
         transcriber = create_transcriber(cfg.asr)
     matcher = WatchwordMatcher.from_toml(cfg.detect)
     classifier = Classifier(cfg.detect)
-    detector = Detector(cfg.detect, matcher, classifier)
+    places = PlaceMatcher.from_toml(cfg.detect) if cfg.detect.strict_urgent else None
+    detector = Detector(cfg.detect, matcher, classifier, places)
 
     stats = PipelineStats()
 

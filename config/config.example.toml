@@ -131,6 +131,21 @@ fuzzy_ignore_phrases  = ["around", "go down", "boat in the water"]
 # Ch 16 traffic. A call from the US Coast Guard that merely mentions "Victoria
 # Coast Guard" is demoted too (known gap; revisit with place-name tagging).
 out_of_area_phrases   = ["victoria coast guard", "victoria traffic"]
+# STRICT URGENT GATE (docs/decisions.md D35). While the system is being tuned, a
+# CRITICAL/URGENT alert (the ones that ring the phone) needs a Coast Guard mayday or
+# pan-pan (exact watchword + a Coast Guard speaker phrase) AND an in-territory place
+# name (config/places.toml, else places.example.toml). The Coast Guard often opens
+# with the pan-pan, pauses, then gives the place in its next transmission, so the two
+# may be up to strict_window_s apart: the opener is held at WATCH, and a later Coast
+# Guard transmission naming an in-zone place within the window escalates it.
+# Anything else rates WATCH: still on the console and in the silent Telegram stream,
+# never ringing. This knowingly misses a kayaker or a fishing boat calling for help.
+# Set false to go back. The code default is false, so a host needs this line in ITS
+# own config.toml.
+strict_urgent           = true
+urgent_call_terms       = ["mayday", "may day", "mayday relay", "pan pan"]
+urgent_speaker_phrases  = ["coast guard"]
+strict_window_s         = 300   # how long a held pan-pan waits for its place
 llm_min_words         = 8      # classify longer transcripts even with no match
 llm_min_confidence    = 0.6    # below this the LLM verdict only rates WATCH
 llm_timeout_s         = 5.0

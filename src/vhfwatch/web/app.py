@@ -64,6 +64,7 @@ def _tier_words(tier: str) -> str:
         "watchword": "keyword match only (offline tier)",
         "llm": "language-model classification only — no keyword matched",
         "both": "keyword match, confirmed by language-model classification",
+        "window": "Coast Guard mayday/pan-pan earlier, place named in a later transmission",
     }.get(tier, tier)
 
 

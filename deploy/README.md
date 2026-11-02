@@ -325,6 +325,7 @@ nothing exposed. Read an install script before piping it to a shell.
   instead; a hang in the watchdog task itself would not be caught.
 - **Hardening** (`ProtectSystem=strict` etc.), deferred until the service is
   proven, for the reason in the unit file.
+- **Strict urgent gate (D35).** The code default is off, so the host's own `config/config.toml` needs `strict_urgent = true` under `[detect]` (see `config.example.toml`) and a restart. Check the log for `detection.demoted_strict_urgent` lines afterwards.
 - **Recording retention.** `[storage] retention_days = 90` exists in the config,
   but **nothing deletes old recordings — the setting is not implemented.** At a
   few transmissions a day that is megabytes per week, so it does not matter for
