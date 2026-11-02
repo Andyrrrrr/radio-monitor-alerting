@@ -1196,3 +1196,80 @@ the fix is an in-area override from place-name tagging, not removing this rule.
 
 **Revisit when** place-name tagging exists (it can override this for in-area places),
 or when the log shows a demoted call that should have rung.
+
+## D35 — Strict urgent gate: only a Coast Guard mayday/pan-pan naming an in-zone place rings
+
+**Decided 2026-11-02**, at the operator's request, while the team troubleshoots other
+ways of running the system. **Temporary by intent.** AGENTS.md already accepts missed
+detections over false alarms; this pushes that to its limit on purpose.
+
+**The rule** (`[detect] strict_urgent = true`). A CRITICAL or URGENT detection keeps its
+severity only if a Coast Guard transmission has all three of (the place may come later, see
+the addendum): an **exact** mayday / pan-pan
+watchword (`urgent_call_terms`), a Coast Guard speaker phrase (`urgent_speaker_phrases`,
+default "coast guard"), and a name from the **in-territory** list (`config/places.toml`,
+else `config/places.example.toml`, aliases included). Anything else rates **WATCH**:
+console and the silent Telegram stream, no phone ring. It runs after the D34 Victoria
+cap, so a Victoria call can never ring. It only ever lowers severity, and every demotion
+is logged (`detection.demoted_strict_urgent`) with the reason
+(`no_mayday_or_pan_pan`, `not_coast_guard`, `no_in_territory_place`) and any out-of-zone
+or edge names found.
+
+**What it knowingly costs.** A vessel's own mayday, a kayaker, a fishing boat, a man
+overboard that is not announced as a mayday or pan-pan, and any Coast Guard call that
+does not say the place in the same transmission. All of them stay visible in the silent
+stream; none ring. The operator accepted this.
+
+**Measured on real data (same-transmission version): it turned every ring off.**
+Replayed Tier 1 only over 422 transcripts (Sep 7 to Nov 2): 17 would have rung without
+the gate, 0 with it. Most of the 17 are Coast Guard announcement openers ("Pan-pan x3,
+all stations, this is Coast Guard Sector Puget Sound, break"), and a few are Whisper
+reading the Coast Guard's recorded channel 16 notice. **Correction to an earlier claim:**
+this decision first said the location is spoken on channel 22A and so cannot be heard.
+The data says otherwise: the location follows the opener within about 30 seconds, on
+channel 16, as a separate transmission. The gate was blind to it only because it required
+everything in one transmission. That is what the addendum fixes.
+
+**Guards against the gate silently muting everything.** `strict_urgent` with no place
+lists raises at startup, as does an alias pointing at an unlisted name; a missing places
+file raises (only the default path falls back to the example).
+
+**Known weak spots.** The place match is whole-word anywhere in the transcript, so a
+destination ("bound for Friday Harbor") counts; an in-zone name that also exists
+elsewhere can ring a call that should not. Both are false alarms, the cheap error.
+
+### D35 addendum 2026-11-02: the place may come in a later transmission (the window)
+
+**Why.** The Coast Guard often opens a pan-pan, says "break", and gives the vessel and
+place in its next transmission. Requiring both in one transmission rang nothing.
+
+**How.** A Coast Guard mayday/pan-pan held only for lacking a place becomes an *anchor*
+for `strict_window_s` (default 300 s). A later transmission that has a Coast Guard speaker
+phrase AND an in-territory place, and is not from an out-of-area station (the Victoria
+phrases), completes it: that transmission is stored as a detection with
+`tier = "window"` at the anchor's severity, carries the anchor's matched terms, and the
+correlator escalates the incident (the opener already opened a WATCH incident, so both
+transmissions sit in one record). One escalation per anchor. Clock is the same wall clock
+the correlator uses, injectable for tests.
+
+**Two deliberate tightenings of "all three anywhere in five minutes".** (1) The anchor
+needs the pan-pan and the Coast Guard phrase in the *same* transmission, and (2) the
+completing transmission needs its *own* Coast Guard phrase. Otherwise a vessel's mayday
+two minutes before, plus any unrelated boat naming a harbour, would add up to a ring.
+
+**Measured.** Replayed over the same 422 transcripts, in time order: **4 rings**, all real
+Coast Guard broadcasts: an adrift 24-foot vessel near the Swinomish Channel railroad bridge,
+rebroadcast three times (10-30 21:11, 21:27, 21:44), and a green flare near Rosario Strait
+(10-31 12:46). It took one new alias ("Swinomas Channel"). What it still misses: openers
+Whisper garbles beyond a pan-pan match (10-31 13:30), bodies that give only coordinates or a
+garbled place ("over value street" for Rosario Strait, 10-31 13:16 and 15:52), and anything
+where the Coast Guard never says "Coast Guard".
+
+**Known costs.** A repeated rebroadcast more than 5 minutes after the last rings again
+(the 21:27 and 21:44 repeats each rang). A cancellation ("false alert", "assistance is no
+longer needed") is not understood. A held pan-pan state lives in memory and is lost on
+restart, which at worst delays one ring.
+
+**Revisit when** the team is ready to turn the gate off; or to use spoken coordinates
+inside the zone (`detect/position.py`, D30) as place evidence, which would catch the two
+garbled-name bodies above; or to stop repeats of the same report ringing again.

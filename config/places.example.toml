@@ -1,15 +1,17 @@
-# DRAFT place-name lists for the response zone. NOT READ BY ANY CODE YET: this file
-# only exists so a person can review and correct it before it is wired in.
+# Place-name lists for the response zone. READ BY THE STRICT URGENT GATE (D35); copy to
+# config/places.toml to edit a host's own copy, otherwise this file is used.
 #
-# HOW THE LISTS WOULD BE USED (proposal, to be confirmed):
-#   in_territory  -> a call naming one of these keeps its severity (can ring).
-#   edge          -> boundary or ambiguous: treated like "unknown", never demoted.
-#   out_of_territory -> a call naming one of these, and NO in_territory name, is
-#                   capped at WATCH (D34 mechanism). Anything not listed anywhere
-#                   is unknown and keeps its severity.
-# In-territory wins any tie, so a name that also exists elsewhere (Eagle Harbor,
-# Mud Bay, West Point) can only ever PREVENT a demotion, never cause one. That is
-# why the in-territory list can safely be generous and the out list must be careful.
+# HOW THE LISTS ARE USED:
+#   in_territory  -> the ONLY list the gate acts on: a Coast Guard mayday or pan-pan
+#                   keeps its URGENT/CRITICAL severity only if one of these is named.
+#   edge          -> boundary waters. Not in-territory, so they cannot make a call ring.
+#   out_of_territory -> not needed to demote (anything without an in-territory name is
+#                   demoted); the gate only records which of these were named, in the
+#                   log line, so a demotion can be reviewed.
+# In-territory wins any tie. With the gate this matters in one direction: a name that
+# also exists elsewhere (Eagle Harbor, Mud Bay, West Point) can make a call ring when
+# it should not, never the reverse. That is a false alarm, not a miss, and the gate
+# only ever fires for a Coast Guard mayday/pan-pan, so it is the cheap error.
 #
 # SOURCE: named features inside the map extent from OpenStreetMap
 # (c) OpenStreetMap contributors, ODbL (openstreetmap.org/copyright), pulled
@@ -156,6 +158,7 @@ f_names = [
 # An alias counts as the place it points to (in, edge or out by that name's list).
 "Vendovi Island" = ["Indovia Island", "Andobe Island", "Mendoza Island", "Vindobi Island"]  # 2026-10-12 tug exchange (three spellings, from "head down to Bellingham channel") and 2026-10-29 "between Eliza Rock and Vindobi Island", which supports the reading
 "Fairhaven" = ["Fair Haven"]  # 2026-10-23 Coast Guard broadcast, "vicinity of Fair Haven"
+"Swinomish Channel" = ["Swinomas Channel"]  # 2026-10-30 Coast Guard broadcast, "adrift in vicinity of the Swinomas Channel"
 "Squalicum Harbor" = ["Squalicum Boat Harbor"]  # 2026-11-02
 "Port Townsend" = ["Fort Townsend Bay", "Fort Townsend"]  # 2026-10-27 Coast Guard calls, "Fort Townsend Bay"
 "Viti Rocks" = ["B.D. Rocks"]  # 2026-10-12, "just south of B.D. Rocks". A guess (near Vendovi): UNCONFIRMED

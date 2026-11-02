@@ -172,6 +172,19 @@ class DetectConfig(_Section):
     # detection and the per-transmission Telegram message are still kept: a
     # demotion hides nothing. Matched on normalized text like watchwords.
     out_of_area_phrases: list[str] = ["victoria coast guard", "victoria traffic"]
+    # Strict urgent gate (docs/decisions.md D35): while the system is being
+    # troubleshot, CRITICAL/URGENT rings only for a Coast Guard mayday or
+    # pan-pan that also names a place inside the response zone. Everything
+    # else rates WATCH (console, visible, no phone ring). Off by default so a
+    # host picks it up only by an edit to its own config.toml.
+    strict_urgent: bool = False
+    places_path: Path = Path("config/places.toml")  # falls back to the .example
+    urgent_call_terms: list[str] = ["mayday", "may day", "mayday relay", "pan pan"]
+    urgent_speaker_phrases: list[str] = ["coast guard"]
+    # A Coast Guard pan-pan often opens, pauses, then continues with the place
+    # in a LATER transmission. A held pan-pan waits this long for a Coast Guard
+    # transmission that names an in-zone place, then escalates.
+    strict_window_s: float = 300.0
     llm_min_words: int = 8  # classify longer transcripts even with no match
     llm_min_confidence: float = 0.6  # below this the LLM verdict only rates WATCH
     llm_timeout_s: float = 5.0

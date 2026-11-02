@@ -99,7 +99,7 @@ class Detection:
     severity: Severity
     confidence: float  # 0..1
     matched_terms: list[str]
-    tier: str  # "watchword" | "llm" | "both"
+    tier: str  # "watchword" | "llm" | "both" | "window"
     classifier_output: dict[str, object] | None
     created_at: datetime  # UTC, timezone-aware
 

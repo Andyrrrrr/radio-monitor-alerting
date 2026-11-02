@@ -381,6 +381,8 @@ Requirements:
 
 **Out-of-area cap (D34):** a transcript naming a phrase in `[detect] out_of_area_phrases` (default Victoria Coast Guard / Victoria traffic) is capped at WATCH after the table above is applied. Lowers only; never drops.
 
+**Strict urgent gate (D35, opt-in `[detect] strict_urgent`):** after the table and the cap above, CRITICAL/URGENT survives only for a Coast Guard mayday/pan-pan (exact watchword + Coast Guard speaker phrase) that also names an in-territory place from `config/places.toml`; otherwise WATCH. The place may come in a later Coast Guard transmission within `strict_window_s` (default 300 s): the held opener is an anchor, and the completing transmission becomes a `tier = "window"` detection that escalates the incident. Demotions are logged (`detection.demoted_strict_urgent`, with reason); escalations as `detection.window_escalation`.
+
 Watchwords live in `config/watchwords.toml`, fully user-editable, grouped by severity. Starting set:
 
 ```toml
