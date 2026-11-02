@@ -167,6 +167,11 @@ class DetectConfig(_Section):
     # happened to contain one of these words. Each entry is a measured false
     # positive on real Ch 16 traffic (docs/decisions.md D29).
     fuzzy_ignore_phrases: list[str] = ["around", "go down", "boat in the water"]
+    # Transmissions naming one of these are outside the fire boat's response
+    # zone, so they never rate above WATCH (console only, no phone ring). The
+    # detection and the per-transmission Telegram message are still kept: a
+    # demotion hides nothing. Matched on normalized text like watchwords.
+    out_of_area_phrases: list[str] = ["victoria coast guard", "victoria traffic"]
     llm_min_words: int = 8  # classify longer transcripts even with no match
     llm_min_confidence: float = 0.6  # below this the LLM verdict only rates WATCH
     llm_timeout_s: float = 5.0

@@ -145,3 +145,58 @@ def test_llm_severity_mapping(llm_severity: str, expected: Severity) -> None:
     )
     assert d is not None
     assert d.severity is expected
+
+
+# -- out-of-area phrases cap severity at WATCH ---------------------------------
+
+
+def test_victoria_coast_guard_pan_pan_is_capped_at_watch() -> None:
+    # Real Ch 16 wording (2026-10-12): an exact pan-pan is URGENT on its own.
+    d = run_detect(
+        "Station calling, pan-pan, this is Victoria Coast Guard radio, "
+        "do you require assistance?",
+        None,
+    )
+    assert d is not None
+    assert d.severity is Severity.WATCH
+    assert "pan pan" in d.matched_terms or "pan-pan" in d.matched_terms
+
+
+def test_victoria_coast_guard_mayday_is_capped_but_still_recorded() -> None:
+    d = run_detect(
+        "mayday mayday mayday this is Victoria Coast Guard radio",
+        make_assessment(severity="critical", confidence=0.95),
+    )
+    assert d is not None  # demoted, never dropped
+    assert d.severity is Severity.WATCH
+    assert "mayday" in d.matched_terms
+
+
+def test_victoria_traffic_is_capped_at_watch() -> None:
+    d = run_detect("pan pan pan pan this is Victoria traffic Victoria traffic", None)
+    assert d is not None
+    assert d.severity is Severity.WATCH
+
+
+def test_same_mayday_without_victoria_stays_critical() -> None:
+    d = run_detect("mayday mayday mayday this is serenity", None)
+    assert d is not None
+    assert d.severity is Severity.CRITICAL
+
+
+def test_a_vessel_named_victoria_is_not_demoted() -> None:
+    # The phrase is "Victoria Coast Guard", not the word "Victoria": a boat
+    # called Victoria in trouble nearby must still ring.
+    d = run_detect("mayday mayday mayday this is the vessel Victoria", None)
+    assert d is not None
+    assert d.severity is Severity.CRITICAL
+
+
+def test_empty_out_of_area_list_turns_the_rule_off() -> None:
+    d = run_detect(
+        "mayday mayday mayday this is Victoria Coast Guard radio",
+        None,
+        DetectConfig(out_of_area_phrases=[]),
+    )
+    assert d is not None
+    assert d.severity is Severity.CRITICAL
