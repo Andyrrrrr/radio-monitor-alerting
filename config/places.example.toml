@@ -1,0 +1,218 @@
+# DRAFT place-name lists for the response zone. NOT READ BY ANY CODE YET: this file
+# only exists so a person can review and correct it before it is wired in.
+#
+# HOW THE LISTS WOULD BE USED (proposal, to be confirmed):
+#   in_territory  -> a call naming one of these keeps its severity (can ring).
+#   edge          -> boundary or ambiguous: treated like "unknown", never demoted.
+#   out_of_territory -> a call naming one of these, and NO in_territory name, is
+#                   capped at WATCH (D34 mechanism). Anything not listed anywhere
+#                   is unknown and keeps its severity.
+# In-territory wins any tie, so a name that also exists elsewhere (Eagle Harbor,
+# Mud Bay, West Point) can only ever PREVENT a demotion, never cause one. That is
+# why the in-territory list can safely be generous and the out list must be careful.
+#
+# SOURCE: named features inside the map extent from OpenStreetMap
+# (c) OpenStreetMap contributors, ODbL (openstreetmap.org/copyright), pulled
+# 2026-11-02, then filtered by hand. Cross-checked against Wikipedia's San Juan
+# Islands island list. The OUT list below is NOT map-derived except the Canadian
+# names found inside the map extent; the rest is written from general knowledge.
+#
+# ZONE: confirmed by the operator 2026-11-02 as the visible map, roughly 48.40-49.00 N,
+# 123.13-122.44 W (estimated from landmarks in the screenshot, so +/- a few km), then
+# extended west to ~123.24 W to take in the San Juan Island west side (group g_names).
+#
+# Whisper misspells names. The correct spellings are listed in the sections below;
+# how Whisper actually wrote them goes in [aliases], added only from real transcripts.
+
+[in_territory]
+
+# North shore: Point Roberts, Blaine, Drayton Harbor, Birch Bay, Semiahmoo  (14 names)
+a_names = [
+  "Birch Bay", "Birch Point", "Blaine", "Blaine Harbor", "Boundary Bluff", "Cherry Point",
+  "Cottonwood Beach", "Drayton Harbor", "Lily Point", "Point Roberts", "Point Whitehorn",
+  "Semiahmoo", "Semiahmoo Bay", "Tongue Point"
+]
+
+# Bellingham area: Bellingham Bay, Chuckanut, Hale Passage, Lummi Island and Bay, Vendovi, Eliza, Sinclair  (56 names)
+b_names = [
+  "Bakers Reef", "Bellingham", "Bellingham Bay", "Bellingham Harbor", "Boulder Reef",
+  "Brant Island", "Brant Point", "Buckeye Shoal", "Bumstead Spit", "Carter Point",
+  "Cha-Choo-Sen", "Chuckanut", "Chuckanut Bay", "Chuckanut Island", "Chuckanut Point",
+  "Devils Slide", "Dogfish Point", "Echo Point", "Eliza Island", "Fairhaven", "Fern Point",
+  "Ferndale", "Fishermans Cove", "Gooseberry Point", "Governors Point", "Hale Passage",
+  "Inati Bay", "Lawrence Point", "Legoe Bay", "Lummi", "Lummi Bay", "Lummi Island",
+  "Lummi Point", "Marietta", "Neptune Beach", "North Peapod", "Onion Bay", "Pleasant Bay",
+  "Point Francis", "Point Migley", "Port of Bellingham", "Portage Bay", "Portage Channel",
+  "Portage Island", "Portage Point", "Post Point", "Reil Harbor", "Squalicum Harbor",
+  "Sunrise Cove", "The Portage", "Three Rocks", "Tin Slag Rock", "Village Point",
+  "Viti Rocks", "Whiskey Rock", "Wildcat Cove"
+]
+
+# South-east: Anacortes, Fidalgo, Guemes, Cypress, Padilla Bay, Samish  (81 names)
+c_names = [
+  "Alexander Beach", "Alice Bight", "Allan Island", "Allan Pass", "Anacortes", "Bay View",
+  "Bellingham Channel", "Bird Rocks", "Biz Point", "Black Rock", "Boat Harbor",
+  "Burrows Bay", "Burrows Island", "Burrows Pass", "Cap Sante", "Casperson Point",
+  "Clark Point", "Cone Islands", "Cooks Cove", "Cypress Head", "Cypress Island",
+  "Cypress Reef", "Deadman Bay", "Deepwater Bay", "Dennis Shoal", "Dot Island",
+  "Eagle Cliff", "Eagle Harbor", "Edison", "Elephant Rock", "Fidalgo Bay", "Fidalgo Head",
+  "Fidalgo Island", "Fish Point", "Flounder Bay", "Gibraltar", "Goodin Island", "Guemes",
+  "Guemes Channel", "Guemes Island", "Hat Island", "Huckleberry Island", "Jack Island",
+  "James Island", "Kellys Point", "Langley Bay", "Levant Passage", "Long Bay",
+  "Main Wall East", "March Point", "Padilla Bay", "Peartree Bay", "Penguin Harbor",
+  "Pigeon Point", "Reef Point", "Rodger Bluff", "Rosario Strait", "Saddlebag Island",
+  "Samish Bay", "Samish Island", "Scotts Point", "Secret Harbor", "Shannon Point",
+  "Ship Harbor", "Short Bay", "Similk Bay", "Similk Beach", "Sinclair Island",
+  "Snag Buttress", "Strawberry Bay", "Strawberry Island", "Telegraph Bight", "Tide Point",
+  "Towhead Island", "Turners Bay", "Vendovi Island", "William Point", "Williamson Rocks",
+  "Yellow Bluff", "Yellow Bluff Reef", "Young Island"
+]
+
+# Orcas Island and the north isles: Orcas, Eastsound, Waldron, Patos, Sucia, Matia, Rosario Strait west side  (82 names)
+d_names = [
+  "Active Cove", "Alden Bank", "Bare Island", "Barnes Island", "Buck Bay", "Cascade Bay",
+  "China Caves", "Clark Island", "Cluster Islands", "Cowlitz Bay", "Danger Rock",
+  "Deer Harbor", "Doe Bay", "Doe Island", "Dolphin Bay", "Eagle Cove", "Eagle Point",
+  "East Patos Island Cove", "East Sound", "Eastsound", "Echo Bay", "Entertainment Reef",
+  "Ewing Cove", "Ewing Island", "Face Cliff", "Fishery Point", "Fishing Bay",
+  "Flattop Island", "Fossil Bay", "Fox Cove", "Frances’s Cove", "Freeman Island",
+  "Gull Rock", "Harnden Island", "Indian Island", "Judd Cove", "Justice Island",
+  "Lawson Bluff", "Little Patos Island", "Little Sister", "Little Skippy Island",
+  "Little Sucia Island", "Lone Tree Island", "Lovers Cove", "Mail Bay", "Massacre Bay",
+  "Matia Island", "Mouatt Reef", "North Finger Island", "Olga", "Orcas Island", "Otter Cove",
+  "Parker Reef", "Patos Island", "Peapod Rocks", "Picnic Island", "Point Disney",
+  "Point Hammond", "President Channel", "Puffin Island", "Rolfe Cove", "Rosario",
+  "Round Cliff", "Sandy Point", "Segastill Passage", "Seversons Bay", "Shallow Bay",
+  "Ship Bay", "Skipjack Island", "Skull Island", "Skull Rock", "Snoring Bay",
+  "South Finger Island", "South Peapod", "Spring Passage", "Sucia Island", "The Sisters",
+  "Waldron Island", "Waldron", "West Sound", "White Beach Bay", "White Rock"
+]
+
+# South-west: Lopez, Shaw, Decatur, Blakely, San Juan Island (east side), San Juan Channel  (137 names)
+e_names = [
+  "Alegria Island", "Armitage Island", "Bald Bluff", "Barlow Bay", "Bell Island",
+  "Bird Rock", "Blakely Island", "Blind Bay", "Blind Island", "Boulder Island",
+  "Brigantine Bay", "Buck Island", "Buoy Bay", "Canoe Island", "Cattle Point",
+  "Cayou Channel", "Cayou Island", "Center Island", "Charles Island", "Cliff Island",
+  "Coon Island", "Crab Island", "Crane Island", "Davis Bay", "Deadman Island", "Decatur",
+  "Decatur Island", "Deer Point", "Dinner Island", "Double Island", "Enterprise Bay",
+  "Evans Cove", "False Bay", "Fawn Island", "Fisherman Bay", "Flower Island",
+  "Fortress Island", "Friday Harbor", "Frost Island", "Geese Islets", "Goose Island",
+  "Grandma's Cove", "Griffin Bay", "Grindstone Harbor", "Guthrie Cove", "Hall Island",
+  "Hicks Bay", "Hoffman Cove", "Hudson Bay", "Humphrey Head", "Hunter Bay", "Indian Cove",
+  "Inner Passage", "Islandale", "Jasper Cove", "Jensen Bay", "Jones Bay", "Jones Island",
+  "Kanaka Bay", "Kansas Cove", "Kings Point", "Leo Reef", "Long Island", "Lopez Island",
+  "Lopez Pass", "Lopez Sound", "Lopez Village", "Mackaye Harbor", "McConnell Island",
+  "McConnell Rocks", "Merrifield Cove", "Mud Bay", "Mulno Cove", "Mummy Rocks", "Mya Cove",
+  "Neck Point", "Nob Island", "North Bay", "North Pass", "O'Neal Island", "Oak Island",
+  "Obstruction Island", "Obstruction Pass", "Orcas", "Outer Bay", "Parks Bay",
+  "Peavine Pass", "Picnic Cove", "Point George", "Pointer Island", "Pole Pass",
+  "Port Stanley", "Post Office Bay", "Ram Island", "Reed's Bay Island", "Reeds Bay",
+  "Reef Island", "Reef Net Bay", "Richardson", "Richardson Rock", "Rim Island", "Rocky Bay",
+  "Rowboat Cove", "San Juan Channel", "San Juan Island", "San Juan Islands", "Secar Rock",
+  "Shag Rock", "Shark Reef", "Shaw Island", "Shirt Tail Reef", "Shoal Bay", "Shoal Bight",
+  "Small Island", "Spindle Rock", "Swifts Bay", "Sylvan Cove", "Telegraph Bay", "Thatcher",
+  "Thatcher Bay", "Thatcher Pass", "The Pointers", "Tift Rocks", "Trump Island",
+  "Turn Island", "Turn Rock", "Twin Rocks", "Upright Channel", "Victim Island",
+  "Wasp Islands", "Wasp Passage", "Watmough Bay", "Whale Rocks", "White Cliff",
+  "White Cliffs", "Willow Island", "Yellow Island"
+]
+
+# San Juan Island west side and its neighbours (Stuart, Henry, Spieden, Johns, Roche Harbor).
+# Just beyond the first map edge; added at the operator's request 2026-11-02, so the zone's
+# west edge is now roughly 123.24 W here. Haro Strait and Boundary Pass stay in [edge]  (51 names)
+g_names = [
+  "Andrews Bay", "Barren Island", "Battleship Island", "Cemetery Island", "Center Reef",
+  "Davison Head", "Garrison Bay", "Gossip Island", "Gossip Islands", "Gull Reef",
+  "Guss Island", "Happy Island", "Henderson Point", "Horseshoe Bay",
+  "Johns Pass", "Kellett Bluff", "Lime Kiln Point",
+  "Low Island", "McCracken Point", "Mitchell Bay", "Mosquito Bay", "Mosquito Pass",
+  "Nelson Bay", "New Channel", "Open Bay", "Pearl Island", "Pole Island", "Posey Island",
+  "Prevost Harbor", "Read's Point", "Reef Bay", "Reid Harbor", "Ripple Island",
+  "Satellite Island", "Sentinel Island", "Shag Reef", "Smallpox Bay",
+  "Smugglers Cove", "Spieden Bluff", "Spieden Channel",
+  "Sunken Rock", "Sunset Point", "Turn Point", "Turn Point Lighthouse", "Westcott Bay"
+]
+
+# Map margins, inside the visible map but near its south and west edge: Deception
+# Pass, Lopez's south end, San Juan Island's west side. Included because the zone is
+# the visible map; the edge was estimated from landmarks, so names within ~3 km of it are the least certain  (47 names)
+f_names = [
+  "Aleck Bay", "Aleck Rocks", "Ben Ure Island", "Bowman Bay", "Cactus Island",
+  "Cactus Islands", "Canoe Pass", "Castle Island", "Colville Island",
+  "Davidson Rock Light 1", "Deception Island", "Deception Pass", "Dewey", "Flagstaff Point",
+  "Green Point", "Gun Point", "Hoypus Point", "Hughes Bay", "Iceberg Island", "Iowa Rock",
+  "Kiket Bay", "Kiket Island", "Lang Bay", "Lawson Reef", "Lighthouse Point",
+  "Limestone Point", "Lone Tree Point", "Lonesome Cove", "Lottie Bay", "Lottie Point",
+  "Mac's Cove", "McArdle Bay", "Miller Bay", "Northwest Island", "Northwest Pass",
+  "Pass Island", "Sares Head", "Sharpe Cove", "Skagit Island", "Snee Oosh",
+  "Snee-oosh Point", "Swinomish Channel", "Swirl Island", "Vista Point", "Walk Out",
+  "West Point", "Yokeko Point"
+]
+
+[aliases]
+# How Whisper actually wrote a place, mapped to the correct name above. Only add a
+# spelling seen in a real transcript, with the date and what it was confirmed against.
+# An alias counts as the place it points to (in, edge or out by that name's list).
+"Vendovi Island" = ["Indovia Island", "Andobe Island", "Mendoza Island", "Vindobi Island"]  # 2026-10-12 tug exchange (three spellings, from "head down to Bellingham channel") and 2026-10-29 "between Eliza Rock and Vindobi Island", which supports the reading
+"Fairhaven" = ["Fair Haven"]  # 2026-10-23 Coast Guard broadcast, "vicinity of Fair Haven"
+"Squalicum Harbor" = ["Squalicum Boat Harbor"]  # 2026-11-02
+"Port Townsend" = ["Fort Townsend Bay", "Fort Townsend"]  # 2026-10-27 Coast Guard calls, "Fort Townsend Bay"
+"Viti Rocks" = ["B.D. Rocks"]  # 2026-10-12, "just south of B.D. Rocks". A guess (near Vendovi): UNCONFIRMED
+
+[edge]
+# Water bodies the zone only partly covers. Treated like "unknown": a call naming
+# only these is never demoted, and they never rescue an out-of-territory call.
+names = [
+  "Boundary Pass", "Georgia Strait", "Haro Strait", "Strait of Georgia"
+]
+
+[out_of_territory]
+# Canadian side: names the map itself shows north/west of the border (Saturna,
+# Tumbo and Cabbage Islands), plus well-known Canadian places from general knowledge.
+canada = [
+  "Active Pass", "Bamfield", "Baynes Channel", "Bedwell Harbour", "Boiling Reef",
+  "Boot Cove", "Bowen Island", "Bruce Bight", "Cabbage Island", "Cactus Point",
+  "Chatham Islands", "Discovery Island", "East Point", "Esquimalt", "Fiddler's Cove",
+  "Fraser River", "Galiano Island", "Gowlland Point", "Gulf Islands", "Howe Sound",
+  "Iona Island", "Java Islets", "Kelp Reefs", "Lyall Harbour", "Mayne Island",
+  "Monarch Head", "Mount Parke", "Nanaimo", "Narvaez Bay", "New Westminster",
+  "North Pender Island", "Pender Canal", "Pender Island", "Pine Islet", "Plumper Sound",
+  "Poets Cove", "Port Browning", "Port Renfrew", "Reef Harbour", "Richmond", "Saanich",
+  "Salt Spring Island", "Saturna Island", "Saturna Point", "Savage Point", "Sechelt",
+  "Sidney", "Sooke", "South Pender Island", "Steveston", "Swanson Channel", "Swartz Bay",
+  "Texada Island", "Tofino", "Tsawwassen", "Tumbo Channel", "Tumbo Island", "Tumbo Point",
+  "Tumbo Reef", "Vancouver", "Vancouver Island", "Victoria"
+]
+# US waters well outside the zone. General knowledge, not map-verified: a starter
+# list to grow from real transcripts.
+us_elsewhere = [
+  "Admiralty Bay", "Admiralty Inlet", "Bainbridge Island", "Bremerton", "Camano Island",
+  "Cape George", "Central Strait", "Coupeville", "Discovery Bay", "Dungeness", "Edmonds",
+  "Elliott Bay", "Everett", "Holmes Harbor", "Hood Canal", "Juan de Fuca Strait", "Kingston",
+  "Langley", "Mukilteo", "Neah Bay", "Oak Harbor", "Olympia", "Port Angeles", "Port Gardner",
+  "Port Ludlow", "Port Madison", "Port Townsend", "Port Townsend Bay", "Possession Sound",
+  "Saratoga Passage", "Sequim", "Shilshole", "Strait of Juan de Fuca", "Tacoma",
+  "Vashon Island"
+]
+# Just beyond the visible map's edge. Named in the San Juan Islands but outside the
+# zone as drawn; move any back to in_territory if the zone should reach them.
+just_outside_map = [
+  "Cape San Juan", "Hein Bank", "La Conner", "Skagit Bay", "Whidbey Island"
+]
+# Deliberately NOT listed above, learned from real transcripts (2026-11-02):
+#   "Puget Sound" - in every real mention it is "Coast Guard Sector Puget Sound", the
+#       unit that runs this whole area, not a place. Whisper garbles it ("Puget Town",
+#       "sector view to sound"), so it must never count as a location.
+#   "Seattle" - every real mention is "Seattle Traffic", the vessel traffic service,
+#       whose area includes Rosario Strait. Also a destination people name.
+#   Big city names are the riskiest entries here ("bound for Victoria"): the matcher
+#   should only count a name after location wording ("in the vicinity of", "off", "near").
+
+# Operator decision 2026-11-02: nobody on the team knows where this is, it is not among
+# the named features OpenStreetMap shows inside the map, so it is treated as outside.
+# It appeared in Coast Guard calls on 2026-10-24 ("vicinity of Strawberry Cove").
+# REVISIT if a local says it is inside the zone.
+operator_unknown = [
+  "Strawberry Cove"
+]
