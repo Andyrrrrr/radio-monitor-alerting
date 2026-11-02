@@ -109,7 +109,6 @@ class PipelineStats:
     detections: int = 0
     incidents_opened: int = 0
     queue_drops: int = 0
-    alerts_sent: int = 0
     # Wall-clock-independent: monotonic, so a clock step cannot fake liveness.
     last_frame_at: float = field(default_factory=time.monotonic)
     _open_incident_ids: set[str] = field(default_factory=set)
@@ -354,9 +353,7 @@ async def run(
                         ok=ar.ok,
                         detail=ar.detail,
                     )
-                    if ar.ok:
-                        stats.alerts_sent += 1
-                    elif ar.retryable:
+                    if not ar.ok and ar.retryable:
                         # The first attempt already happened, in line. A retry
                         # must NOT block detection, so it goes to the outbox,
                         # at the front of the queue: a mayday never waits

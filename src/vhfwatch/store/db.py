@@ -169,22 +169,6 @@ class Database:
         )
         return list(cur.fetchall())
 
-    def recent_transcripts(self, limit: int) -> list[sqlite3.Row]:
-        """Latest transcripts joined with their transmission times, newest
-        first — the Tier 2 classifier's source of preceding-transmission
-        context (docs/architecture.md §5.5)."""
-        cur = self._conn.execute(
-            """
-            SELECT t.*, x.started_at AS tx_started_at
-            FROM transcript t JOIN transmission x ON x.id = t.transmission_id
-            ORDER BY x.started_at DESC LIMIT ?
-            """,
-            (limit,),
-        )
-        return list(cur.fetchall())
-
-    # -- detections --------------------------------------------------------
-
     def insert_detection(self, d: Detection) -> None:
         with self._conn:
             self._conn.execute(

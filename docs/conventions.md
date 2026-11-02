@@ -133,3 +133,11 @@ per-segment stats, a segment that didn't report a value must be excluded
 from that value's mean, not counted as zero — diluting `avg_logprob` toward
 zero makes it look *better*, and optimism is the one direction a gate input
 must never drift.
+
+## 11. Removing a config key
+
+Config sections use `extra="forbid"`, so deleting a key from `config.py` makes every
+existing `config.toml` that still contains it fail at startup, including the station
+host's. A key nothing reads (`storage.playback_codec`, found in the 2026-11-02 cleanup)
+stays until the same change also removes it from each live `config.toml`, or the model
+is taught to ignore it. Never remove one as a drive-by cleanup.
