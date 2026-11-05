@@ -1221,14 +1221,20 @@ does not say the place in the same transmission. All of them stay visible in the
 stream; none ring. The operator accepted this.
 
 **Measured on real data (same-transmission version): it turned every ring off.**
-Replayed Tier 1 only over 422 transcripts (Sep 7 to Nov 2): 17 would have rung without
-the gate, 0 with it. Most of the 17 are Coast Guard announcement openers ("Pan-pan x3,
-all stations, this is Coast Guard Sector Puget Sound, break"), and a few are Whisper
-reading the Coast Guard's recorded channel 16 notice. **Correction to an earlier claim:**
-this decision first said the location is spoken on channel 22A and so cannot be heard.
-The data says otherwise: the location follows the opener within about 30 seconds, on
-channel 16, as a separate transmission. The gate was blind to it only because it required
-everything in one transmission. That is what the addendum fixes.
+Replayed Tier 1 only over all stored transcripts (Sep 7 to Nov 5), *after* the same
+hallucination gate the pipeline applies before detection (426 of 510 transcripts reach
+detection; 84 are rejected first): 19 transmissions would have rung under the old rules,
+17 with the Victoria rule alone (D34), **0** with a same-transmission gate. Most of the 19
+are Coast Guard announcement openers ("Pan-pan x3, all stations, this is Coast Guard
+Sector Puget Sound, break"). **Correction (2026-11-05):** the first version of this
+paragraph said "17 without the gate, 0 with it" over 422 transcripts. That replay skipped
+the hallucination gate, so it counted transcripts the pipeline throws away (Whisper
+looping on the Coast Guard's recorded channel 16 notice, repeated words); the old-rules
+figure was overstated. **Second correction to an earlier claim:** this decision first said
+the location is spoken on channel 22A and so cannot be heard. The data says otherwise:
+the location follows the opener within about 30 seconds, on channel 16, as a separate
+transmission. The gate was blind to it only because it required everything in one
+transmission. That is what the addendum fixes.
 
 **Guards against the gate silently muting everything.** `strict_urgent` with no place
 lists raises at startup, as does an alias pointing at an unlisted name; a missing places
@@ -1257,13 +1263,25 @@ needs the pan-pan and the Coast Guard phrase in the *same* transmission, and (2)
 completing transmission needs its *own* Coast Guard phrase. Otherwise a vessel's mayday
 two minutes before, plus any unrelated boat naming a harbour, would add up to a ring.
 
-**Measured.** Replayed over the same 422 transcripts, in time order: **4 rings**, all real
-Coast Guard broadcasts: an adrift 24-foot vessel near the Swinomish Channel railroad bridge,
-rebroadcast three times (10-30 21:11, 21:27, 21:44), and a green flare near Rosario Strait
-(10-31 12:46). It took one new alias ("Swinomas Channel"). What it still misses: openers
-Whisper garbles beyond a pan-pan match (10-31 13:30), bodies that give only coordinates or a
-garbled place ("over value street" for Rosario Strait, 10-31 13:16 and 15:52), and anything
-where the Coast Guard never says "Coast Guard".
+**Measured.** Replayed in time order over the same stored transcripts as above, with the
+hallucination gate applied first: **4 rings** (old rules 19, Victoria rule alone 17,
+same-transmission gate 0). All 4 are real Coast Guard broadcasts: an adrift 24-foot vessel
+near the Swinomish Channel railroad bridge, rebroadcast three times (10-30 21:11, 21:27,
+21:44), and a green flare near Rosario Strait (10-31 12:46). It took one new alias
+("Swinomas Channel"). What it still misses: openers Whisper garbles beyond a pan-pan match
+(10-31 13:30), bodies that give only coordinates or a garbled place ("over value street" for
+Rosario Strait, 10-31 13:16 and 15:52), and anything where the Coast Guard never says
+"Coast Guard". The replay uses the example config's hallucination thresholds, not the
+host's own, and no language model (the host runs without one), so it can differ slightly
+from live.
+
+**Checked against the live host, 2026-11-05.** Nov 1 to Nov 5 (108 transcripts, 91 reaching
+detection): old rules 4 urgent/critical transmissions, new rules 0. The host's own log since
+its Nov 2 restart agrees: three `detection.demoted_strict_urgent` lines (two Coast Guard
+pan-pan broadcasts about a sailing vessel in distress near Port Townsend, south of the zone,
+reason `no_in_territory_place`; one "Pan-pan, securite." fragment, reason `not_coast_guard`),
+no rings, no errors, no restarts. The one real distress broadcast in those days was outside
+the zone, so no in-zone call has tested the gate yet.
 
 **Known costs.** A repeated rebroadcast more than 5 minutes after the last rings again
 (the 21:27 and 21:44 repeats each rang). A cancellation ("false alert", "assistance is no

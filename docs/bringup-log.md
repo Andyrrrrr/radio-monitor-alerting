@@ -1570,11 +1570,17 @@ as in-territory. Restarted `vhfwatch-pipeline` at 20:51 UTC: one process (MainPI
 
 **Not yet verified live:** that a Coast Guard pan-pan followed by a spoken in-zone place rings,
 and that everything else logs `detection.demoted_strict_urgent` without ringing. Those lines
-only appear when a pan-pan or mayday arrives. Replay over 422 real transcripts predicted 4
+only appear when a pan-pan or mayday arrives. Replay over the real transcripts (after the hallucination gate) predicted 4
 rings (an adrift vessel near the Swinomish Channel railroad bridge, rebroadcast three times,
 and a green flare near Rosario Strait), so expect rebroadcasts of one report to ring again
 if more than 5 minutes apart. To undo: set `strict_urgent = false` (or restore the backup)
 and restart; for the old code, `git checkout parker-hardware-setup`.
+
+**Checked 2026-11-05 (3 days later):** pipeline up since the restart, one start, no warnings or
+errors. The gate logged three demotions and zero rings: two Coast Guard pan-pans about a
+sailing vessel in distress near Port Townsend (outside the zone, correctly held back) and one
+"Pan-pan, securite." fragment with no Coast Guard speaker. Still not seen live: an in-zone
+call ringing. Details and the replay comparison are in D35.
 
 ---
 
