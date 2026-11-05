@@ -1547,6 +1547,43 @@ Telegram message delivered on the first attempt, no stalls or errors.
   the wifi card name (Device Manager), and a borrowed monitor and keyboard. Plan is
   Ubuntu Server 24.04 then deploy/README.md. Pipeline stopped for the day.
 
+### 2026-11-02, strict urgent gate (D35) deployed to the station host
+
+Switched the host's `/opt/vhfwatch` from `parker-hardware-setup` (`43bad08`) to `main` and
+fast-forwarded it to `2e9fd73` (PRs 4, 5, 6: the Victoria rule D34, the place lists, and the
+strict gate with its 5-minute window D35). Git ran as `sudo -u vhfwatch`. The working tree was
+clean before the switch (untracked `.cache/`, `model-download.log`, `pip-install.log` only).
+Skipped `pip install -e`: no new dependency, and the editable install picks up the new
+`detect/places.py` by itself.
+
+**Config change on the host** (`config/config.toml`, backup beside it as
+`config.toml.bak-2026-11-02`): added `strict_urgent = true` as the first line under
+`[detect]`. The code default is off, so this line is what turns the gate on. Everything else
+uses defaults: `strict_window_s = 300`, place lists from `config/places.example.toml`
+(`places.using_example` is logged at start, expected, not an error).
+
+Checked before restarting: the config loads, and the place matcher returns `Rosario Strait`
+as in-territory. Restarted `vhfwatch-pipeline` at 20:51 UTC: one process (MainPID 8448),
+`asr.warmed_up` in 2.7 s, capture started on `USB Audio CODEC` at 48 kHz with
+`use_channel=0`, the "started" notice reached console and Telegram, no errors in the first 40 s.
+`vhfwatch-web` was already inactive before this change and was left alone.
+
+**Not yet verified live:** that a Coast Guard pan-pan followed by a spoken in-zone place rings,
+and that everything else logs `detection.demoted_strict_urgent` without ringing. Those lines
+only appear when a pan-pan or mayday arrives. Replay over the real transcripts (after the hallucination gate) predicted 4
+rings (an adrift vessel near the Swinomish Channel railroad bridge, rebroadcast three times,
+and a green flare near Rosario Strait), so expect rebroadcasts of one report to ring again
+if more than 5 minutes apart. To undo: set `strict_urgent = false` (or restore the backup)
+and restart; for the old code, `git checkout parker-hardware-setup`.
+
+**Checked 2026-11-05 (3 days later):** pipeline up since the restart, one start, no warnings or
+errors. The gate logged three demotions and zero rings: two Coast Guard pan-pans about a
+sailing vessel in distress near Port Townsend (outside the zone, correctly held back) and one
+"Pan-pan, securite." fragment with no Coast Guard speaker. Still not seen live: an in-zone
+call ringing. Details and the replay comparison are in D35.
+
+---
+
 ### 2026-10-25, silent transmissions deployed to the station host (D33)
 
 Pulled `parker-hardware-setup` on the host (`/opt/vhfwatch`, fast-forward, now at
