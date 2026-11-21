@@ -44,6 +44,11 @@ dependencies = [
   "jinja2>=3.1",
   # python-multipart: FastAPI's form parsing (ack/feedback/annotation forms)
   "python-multipart>=0.0.9",
+  # pywebpush: home-screen alerts (Web Push). The standard implementation of
+  # VAPID signing and payload encryption, which must not be hand-written
+  # (docs/plans/2026-11-21-home-screen-push-alerts.md). Brings py-vapid and
+  # cryptography.
+  "pywebpush>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -79,7 +84,7 @@ explicit_package_bases = true
 # Audio/ML libraries that ship no type stubs. Calls into them are still
 # checked against our annotations; only their internals go unchecked.
 [[tool.mypy.overrides]]
-module = ["sounddevice", "soxr", "mlx_whisper", "faster_whisper"]
+module = ["sounddevice", "soxr", "mlx_whisper", "faster_whisper", "pywebpush", "py_vapid"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

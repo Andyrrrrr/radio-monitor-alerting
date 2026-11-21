@@ -176,6 +176,7 @@ async def run(
                 cfg.alerting,
                 cfg.general.local_timezone,
                 link_for=lambda inc: mint_share_link(db, cfg.web, inc.id),
+                push_store=db,
             )
             router = AlertRouter(cfg.alerting, channels)
 

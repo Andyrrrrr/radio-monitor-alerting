@@ -339,6 +339,24 @@ the Tailscale app and an invitation to the tailnet; check Tailscale's current fr
 limit against the number of people. `base_url` is what alert links are built from: until
 it is a reachable address, the link in each Telegram alert opens nothing on a phone.
 
+## Home-screen alerts (optional)
+
+Phones that add the Marine 1 page to the home screen can get urgent alerts as
+notifications (docs/plans/2026-11-21-home-screen-push-alerts.md). iPhones allow that
+only from an `https` address, so:
+
+1. In the Tailscale admin console, DNS page, turn on **HTTPS Certificates** (MagicDNS
+   must be on). The machine name then appears in public certificate logs.
+2. On the host: `sudo tailscale serve --bg 8080`. The app is now also at
+   `https://<host>.<tailnet>.ts.net/`, tailnet-only (this is `serve`, not `funnel`).
+   Requests through it arrive from 127.0.0.1, so they are trusted like the tailnet.
+3. Generate the key once and add it to `/etc/vhfwatch/vhfwatch.env` without printing it:
+   `sudo -u vhfwatch .venv/bin/python -m vhfwatch.alerting.webpush | sudo tee -a /etc/vhfwatch/vhfwatch.env >/dev/null`
+4. In `config/config.toml`: add `"webpush"` to `channels_critical` and `channels_urgent`,
+   and set `[web] base_url` to the `https://...ts.net` address (alert links use it).
+5. Restart both units. On the phone: open the `https` address in Safari, Share, **Add to
+   Home Screen**, open Marine 1 from the icon, **Turn on alerts**, **Send test alert**.
+
 ## Not built, so do not assume
 
 - **`WatchdogSec=` / `sd_notify`.** systemd can also kill a *hung-but-alive*
