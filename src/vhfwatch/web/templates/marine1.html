@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Marine 1 — vhf-watch{% endblock %}
+{% block head %}
+<style>
+  h2 { font-size: 1.05rem; margin: 1.4rem 0 0.4rem; }
+  .now { display: grid; gap: 0.5rem; grid-template-columns: 1fr; }
+  @media (min-width: 40rem) { .now { grid-template-columns: 1fr 1fr; } }
+  .alert { border-left: 4px solid #c0392b; padding: 0.4rem 0.7rem;
+           background: rgba(192,57,43,.08); margin: 0.4rem 0; }
+  .stale { color: #b9770e; }
+  .tx-head { display: flex; gap: 0.5rem; align-items: baseline; flex-wrap: wrap; }
+  .tx audio { width: 100%; margin-top: 0.4rem; }
+  .noise { opacity: 0.6; }
+  table.tides { border-collapse: collapse; width: 100%; }
+  table.tides td { padding: 0.2rem 0.4rem; border-bottom: 1px solid rgba(128,128,128,.2); }
+  tr.next { font-weight: 700; }
+  .jump a { margin-right: 0.8rem; }
+  ul.cams { padding-left: 1.1rem; }
+</style>
+{% endblock %}
+{% block content %}
+<h2 style="margin-top:0.6rem">Marine 1</h2>
+<p class="jump muted"><a href="#ch16">Channel 16</a><a href="#tides">Tides</a><a href="#weather">Weather</a><a href="#cams">Webcams</a></p>
+
+{# -- warnings first: they are the reason to look at all ---------------- #}
+{% if forecast.value and forecast.value.alerts %}
+  {% for a in forecast.value.alerts %}<div class="alert"><strong>NWS:</strong> {{ a }}</div>{% endfor %}
+{% endif %}
+
+<div class="now">
+  <div class="card">
+    <div class="muted">Next tide, {{ stations[station] }}</div>
+    {% if next_tide %}
+      <strong>{{ next_tide.kind }} {{ next_tide.at.strftime("%H:%M") }}</strong>, {{ "%.1f" | format(next_tide.height_ft) }} ft
+    {% else %}
+      <span class="muted">unavailable</span>
+    {% endif %}
+  </div>
+  <div class="card">
+    <div class="muted">Marine forecast{% if forecast.value and forecast.value.periods %}, {{ forecast.value.periods[0][0] }}{% endif %}</div>
+    {% if forecast.value and forecast.value.periods %}
+      {{ forecast.value.periods[0][1] }}
+    {% else %}
+      <span class="muted">unavailable</span>
+    {% endif %}
+  </div>
+</div>
+
+{# -- channel 16 ------------------------------------------------------- #}
+<h2 id="ch16">Channel 16</h2>
+<p class="muted">Newest first, updates by itself. The text is a computer's guess and is
+often wrong, especially names, numbers and positions: when it matters, play the recording.</p>
+<div id="feed">{% include "_feed.html" %}</div>
+
+{# -- tides ------------------------------------------------------------ #}
+<h2 id="tides">Tides</h2>
+<form method="get" action="/marine1">
+  {% if token %}<input type="hidden" name="token" value="{{ token }}">{% endif %}
+  <select name="station" onchange="this.form.submit()">
+    {% for sid, name in stations.items() %}
+      <option value="{{ sid }}" {% if sid == station %}selected{% endif %}>{{ name }}</option>
+    {% endfor %}
+  </select>
+  <noscript><button>Show</button></noscript>
+</form>
+{% if tide_days %}
+  <table class="tides">
+    {% for day, events in tide_days.items() %}
+      <tr><td colspan="3" class="muted">{{ day }}</td></tr>
+      {% for e in events %}
+        <tr class="{% if e.is_next %}next{% endif %}"><td>{{ e.time }}</td><td>{{ e.kind }}</td><td>{{ e.height_ft }} ft</td></tr>
+      {% endfor %}
+    {% endfor %}
+  </table>
+{% else %}
+  <p class="muted">Tides unavailable{% if tides.error %} ({{ tides.error }}){% endif %}.</p>
+{% endif %}
+<p class="muted">NOAA predictions (not measured), feet above mean lower low water, station
+{{ station }}. Fetched {{ tides_age }}{% if tides.stale %}, <span class="stale">could not refresh: showing the last copy</span>{% endif %}.</p>
+
+{# -- weather ---------------------------------------------------------- #}
+<h2 id="weather">Marine weather</h2>
+{% if forecast.value %}
+  {% if not forecast.value.alerts %}<p class="muted">No active NWS warnings for this zone.</p>{% endif %}
+  {% for name, text in forecast.value.periods[:6] %}
+    <p><strong>{{ name }}:</strong> {{ text }}</p>
+  {% endfor %}
+{% else %}
+  <p class="muted">Forecast unavailable{% if forecast.error %} ({{ forecast.error }}){% endif %}.</p>
+{% endif %}
+<p class="muted">National Weather Service forecast for zone {{ zone }} (Northern Inland Waters
+including the San Juan Islands){% if forecast.value and forecast.value.updated %}, issued {{ forecast.value.updated }}{% endif %}.
+Fetched {{ forecast_age }}{% if forecast.stale %}, <span class="stale">could not refresh: showing the last copy</span>{% endif %}.</p>
+
+{# -- webcams: links, never embedded (owners' terms not checked) ------- #}
+<h2 id="cams">Webcams</h2>
+<ul class="cams">
+  {% for cam in webcams %}
+    <li><a href="{{ cam.url }}" target="_blank" rel="noopener noreferrer">{{ cam.name }}</a>{% if cam.note %} <span class="muted">({{ cam.note }})</span>{% endif %}</li>
+  {% endfor %}
+</ul>
+
+<script>
+// New transmissions: the server's /live stream says when; then the feed is
+// re-fetched whole. If the stream drops, a slow poll keeps the page current.
+(function () {
+  var tq = {{ tq | tojson }};
+  var feed = document.getElementById("feed");
+  var busy = false;
+  function refresh() {
+    // Don't swap the list out from under someone playing a recording.
+    var playing = Array.prototype.some.call(feed.querySelectorAll("audio"),
+      function (a) { return !a.paused; });
+    if (busy || playing) return;
+    busy = true;
+    fetch("/marine1/feed" + tq).then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (html) { if (html !== null) feed.innerHTML = html; })
+      .finally(function () { busy = false; });
+  }
+  if (window.EventSource) {
+    var es = new EventSource("/live" + tq);
+    es.onmessage = refresh;
+  }
+  setInterval(refresh, 60000);
+})();
+</script>
+{% endblock %}

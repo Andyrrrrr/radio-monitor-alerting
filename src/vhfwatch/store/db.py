@@ -124,6 +124,29 @@ class Database:
         )
         return list(cur.fetchall())
 
+    def recent_feed(self, limit: int) -> list[sqlite3.Row]:
+        """Newest transmissions with their latest transcript (and its decoder
+        stats) and the highest severity any detection gave them: the Marine 1
+        page's channel 16 feed. One query, so the page never does N+1 reads."""
+        cur = self._conn.execute(
+            """
+            SELECT x.id, x.started_at, x.duration_ms, x.est_snr_db, x.audio_path,
+                   t.text, t.avg_logprob, t.no_speech_prob,
+                   (SELECT d.severity FROM detection d
+                     WHERE d.transmission_id = x.id
+                     ORDER BY CASE d.severity WHEN 'critical' THEN 3
+                              WHEN 'urgent' THEN 2 WHEN 'watch' THEN 1 ELSE 0 END DESC
+                     LIMIT 1) AS severity
+            FROM transmission x
+            LEFT JOIN transcript t ON t.id = (
+                SELECT t2.id FROM transcript t2 WHERE t2.transmission_id = x.id
+                ORDER BY t2.created_at DESC LIMIT 1)
+            ORDER BY x.started_at DESC LIMIT ?
+            """,
+            (limit,),
+        )
+        return list(cur.fetchall())
+
     # -- transcripts -----------------------------------------------------
 
     def insert_transcript(self, t: Transcript) -> str:

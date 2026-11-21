@@ -1328,3 +1328,30 @@ named, no ring.
 **Revisit when** the log shows a ring caused by chatter, or when spoken coordinates inside the
 zone (detect/position.py, D30) can release an anchor too: the vessel's GPS position at
 16:15:51 was a second, independent release that this rule still cannot use.
+
+## D36 — The web app trusts the station network and Tailscale, never the internet
+
+**Decided 2026-11-21**, with the Marine 1 page (docs/plans/2026-11-21-marine1-web-dashboard.md),
+at the operators' choice of "station network plus Tailscale".
+
+**The problem.** The web app trusted only loopback; everyone else needed a share token,
+scoped to one incident and minted into an alert link. That fits "open this incident from
+the alert", not "anyone in the program opens the page". The page shows recordings of real
+people, so the open internet stays ruled out (deploy notes, D26's scope).
+
+**What we did.** `[web] trusted_networks`: a list of source ranges treated like loopback (no
+token). Intended contents: Tailscale's 100.64.0.0/10 and the station LAN. Default empty, so
+nothing changes until a host lists something. Share tokens still work for everyone else.
+The config refuses a malformed entry or a range of size zero ("0.0.0.0/0") at startup.
+
+**The cost, stated plainly.** Anyone on a trusted network can open the page and play the
+recordings: every device on the station wifi, and every device on the tailnet. Tailnet
+membership becomes the access list, so removing someone means removing them from
+Tailscale. The trust is by source address, so it is only as good as those networks: never
+port-forward 8080 from the station router, or the internet arrives looking like the LAN.
+
+**Rejected:** a shared password on a public page (forwarded passwords, recordings on the
+internet), user accounts (out of scope), a Telegram Mini App (needs a public address anyway).
+
+**Revisit when** the tailnet grows past the people who should hear the traffic, or someone
+needs access who cannot run Tailscale.

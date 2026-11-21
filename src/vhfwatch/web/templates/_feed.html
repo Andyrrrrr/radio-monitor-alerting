@@ -1,0 +1,27 @@
+{# The channel 16 feed: newest first. Evidence first, as on the incident pages:
+   the recording is always there, the transcript is a machine's guess. #}
+{% if not feed %}
+  <p class="muted">No transmissions recorded yet.</p>
+{% endif %}
+{% for tx in feed %}
+  <div class="card tx{% if tx.rejected %} noise{% endif %}">
+    <div class="tx-head">
+      {% if tx.severity in ("critical", "urgent", "watch") %}
+        <span class="sev sev-{{ tx.severity }}">{{ tx.severity | upper }}</span>
+      {% endif %}
+      <strong>{{ tx.when }}</strong>
+      <span class="muted">{{ tx.duration_s }} s · <span title="signal-to-noise">{{ tx.snr_glyph }}</span></span>
+    </div>
+    {% if tx.audio_url %}
+      <audio controls preload="none" src="{{ tx.audio_url }}"></audio>
+    {% endif %}
+    {% if tx.text is none %}
+      <p class="muted">(not transcribed)</p>
+    {% else %}
+      <p class="quote">{{ tx.text }}</p>
+      {% if tx.rejected %}
+        <p class="muted">Likely noise, not checked for keywords: {{ tx.rejected }}</p>
+      {% endif %}
+    {% endif %}
+  </div>
+{% endfor %}
