@@ -28,6 +28,12 @@
   .msg-more { background: none; border: 0; padding: 0; margin-top: 0.2rem; font: inherit;
               font-size: 0.9rem; font-weight: 600; color: #2b8fc8; cursor: pointer; }
   .msg-pos { font-size: 0.95rem; margin: 0.45rem 0 0; }
+  /* only the newest few messages until "Show more" (JS adds .collapsed; without
+     JS every message shows) */
+  #feed.collapsed .extra { display: none; }
+  .feed-more { display: block; width: 100%; margin: 0.5rem 0 0; padding: 0.55rem; border-radius: 10px;
+               border: 1px solid rgba(128,128,128,.35); background: transparent; color: #2b8fc8;
+               font: inherit; font-weight: 600; cursor: pointer; }
   .msg-pos a { color: #2b8fc8; font-weight: 600; }
   .jump a { margin-right: 0.8rem; }
   ul.cams { padding-left: 1.1rem; }
@@ -79,14 +85,16 @@
     <button type="button" id="tr-now">Now</button>
   </div>
   <svg id="tide-chart" viewBox="0 0 800 420" tabindex="0" role="img"
-       aria-label="Tide curve for today and tomorrow. Drag, or use the arrow keys, to read the height at any time."></svg>
+       aria-label="Tide curve for today and tomorrow, NOAA predictions in feet above mean lower low water; heights between the highs and lows are estimated. Drag, or use the arrow keys, to read the height at any time."></svg>
   <script>window.TIDE = {{ chart | tojson }};</script>
 {% else %}
   <p class="muted">Tides unavailable{% if tides.error %} ({{ tides.error }}){% endif %}.</p>
 {% endif %}
-{# Kept short, but kept: the reader must know which parts are estimates. #}
-<p class="muted">NOAA predictions, feet above mean lower low water, station {{ station }};
-heights between the highs and lows are estimated. Fetched {{ tides_age }}{% if tides.stale %}, <span class="stale">could not refresh: showing the last copy</span>{% endif %}.</p>
+{# The source line was removed at the operators' request; the stale warning
+   is not optional: old tide data shown as current would mislead. #}
+{% if tides.stale and chart %}
+  <p class="muted"><span class="stale">Tides could not refresh: showing the copy fetched {{ tides_age }}.</span></p>
+{% endif %}
 
 {# -- weather ---------------------------------------------------------- #}
 <h2 id="weather">Marine weather</h2>
@@ -107,6 +115,7 @@ Fetched {{ forecast_age }}{% if forecast.stale %}, <span class="stale">could not
 <p class="muted">Newest first, updates by itself. The text is a computer's guess and is
 often wrong, especially names, numbers and positions: when it matters, play the recording.</p>
 <div id="feed" class="feed">{% include "_feed.html" %}</div>
+<button type="button" id="feed-more" class="feed-more" hidden></button>
 
 {# -- webcams: links, never embedded (owners' terms not checked) ------- #}
 <h2 id="cams">Webcams</h2>
@@ -212,6 +221,20 @@ often wrong, especially names, numbers and positions: when it matters, play the 
   var feed = document.getElementById("feed");
   var busy = false;
   var opened = {};  // message ids someone expanded; kept across refreshes
+  var moreBtn = document.getElementById("feed-more");
+  var showAll = false;  // also kept across refreshes
+  function collapseFeed() {
+    var extra = feed.querySelectorAll(".msg.extra").length;
+    feed.classList.toggle("collapsed", !showAll);
+    moreBtn.hidden = extra === 0;
+    moreBtn.textContent = showAll ? "Show fewer" : "Show " + extra + " more";
+  }
+  moreBtn.addEventListener("click", function () {
+    showAll = !showAll;
+    collapseFeed();
+    foldLong();  // messages that were hidden can only be measured once shown
+    if (!showAll) document.getElementById("ch16").scrollIntoView();
+  });
   // Fold long transcripts to six lines, with a "Show more" only where the
   // text really is cut off (that depends on the screen width).
   function foldLong() {
@@ -232,6 +255,7 @@ often wrong, especially names, numbers and positions: when it matters, play the 
     foldLong();
   });
   window.addEventListener("resize", foldLong);
+  collapseFeed();
   foldLong();
   function refresh() {
     // Don't swap the list out from under someone playing a recording.
@@ -240,7 +264,7 @@ often wrong, especially names, numbers and positions: when it matters, play the 
     if (busy || playing) return;
     busy = true;
     fetch("/marine1/feed" + tq).then(function (r) { return r.ok ? r.text() : null; })
-      .then(function (html) { if (html !== null) { feed.innerHTML = html; foldLong(); } })
+      .then(function (html) { if (html !== null) { feed.innerHTML = html; collapseFeed(); foldLong(); } })
       .catch(function () { /* server restarting or offline: keep the old list */ })
       .finally(function () { busy = false; });
   }

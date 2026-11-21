@@ -8,9 +8,9 @@
 {% endif %}
 {% for tx in feed %}
   {% if loop.first or tx.day != loop.previtem.day %}
-    <div class="day-chip"><span>{{ tx.day }}</span></div>
+    <div class="day-chip{% if loop.index0 >= visible %} extra{% endif %}"><span>{{ tx.day }}</span></div>
   {% endif %}
-  <div class="msg{% if tx.rejected %} noise{% endif %}" data-id="{{ tx.id }}">
+  <div class="msg{% if tx.rejected %} noise{% endif %}{% if loop.index0 >= visible %} extra{% endif %}" data-id="{{ tx.id }}">
     {% if tx.audio_url %}
       <audio controls preload="none" src="{{ tx.audio_url }}"></audio>
     {% endif %}

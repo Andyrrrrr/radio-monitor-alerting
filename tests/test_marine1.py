@@ -3,6 +3,7 @@ the page and its feed, and the trusted-networks access rule (D36)."""
 
 import asyncio
 import itertools
+import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -447,3 +448,48 @@ def test_page_shows_no_later_forecast_periods(cfg: Settings) -> None:
     with client(cfg) as c:
         html = c.get("/marine1").text
     assert "<strong>Today:</strong>" in html and "<strong>Tonight:</strong>" in html
+
+
+def test_only_the_newest_feed_visible_show_before_show_more(cfg: Settings) -> None:
+    cfg.web.dashboard.feed_visible = 1
+    with client(cfg) as c:
+        page = c.get("/marine1").text
+        frag = c.get("/marine1/feed").text
+    assert 'id="feed-more"' in page
+    for html in (page, frag):  # the live refresh marks them the same way
+        classes = re.findall(r'<div class="(msg[^"]*)" data-id=', html)
+        assert len(classes) == 2
+        assert "extra" not in classes[0] and "extra" in classes[1]
+
+
+def test_default_shows_eight_before_show_more() -> None:
+    assert DashboardConfig().feed_visible == 8 and DashboardConfig().feed_limit == 40
+
+
+def test_source_line_and_tagline_are_gone_but_the_footer_disclaimer_stays(
+    cfg: Settings,
+) -> None:
+    with client(cfg) as c:
+        html = c.get("/marine1").text
+    assert "supplemental awareness — not a safety system" not in html
+    assert "NOAA predictions, feet above" not in html
+    assert (
+        "Never rely on" in html and "primary alerting path" in html
+    )  # AGENTS.md: keep it
+
+
+def test_stale_tides_still_say_so(cfg: Settings) -> None:
+    clock = Clock()
+    conditions = Conditions(
+        cfg.web.dashboard.model_copy(update={"tides_cache_s": 60}),
+        TZ,
+        transport=good_transport(),
+        clock=clock,
+    )
+    app_client = TestClient(create_app(cfg, conditions), client=("127.0.0.1", 51234))
+    with app_client as c:
+        c.get("/marine1")  # warm the cache
+        conditions._transport = dead_transport()
+        clock.now += timedelta(minutes=5)
+        html = c.get("/marine1").text
+    assert "Tides could not refresh" in html

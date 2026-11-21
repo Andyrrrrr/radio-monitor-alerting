@@ -239,6 +239,7 @@ trusted_networks = []
 # The Marine 1 page (/marine1). Every key has a default; uncomment to change.
 [web.dashboard]
 # feed_limit            = 40          # transmissions shown
+# feed_visible          = 8           # shown before "Show more"
 # forecast_zone         = "PZZ133"    # NWS: Northern Inland Waters incl. San Juan Islands
 # tides_cache_s         = 21600       # NOAA predictions change once a day
 # weather_cache_s       = 900
