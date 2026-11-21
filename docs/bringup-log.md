@@ -1547,6 +1547,42 @@ Telegram message delivered on the first attempt, no stalls or errors.
   the wifi card name (Device Manager), and a borrowed monitor and keyboard. Plan is
   Ubuntu Server 24.04 then deploy/README.md. Pipeline stopped for the day.
 
+### 2026-11-21, the Marine 1 page turned on at the station host (D36)
+
+Merged PR 9 (previous bring-up entry) and PR 10 (the page), then fast-forwarded the host's
+`/opt/vhfwatch` to `28ea13a`. Git ran as `sudo -u vhfwatch`.
+
+**Host network, as found:** `wlp1s0` 172.17.13.157/23 (so the station wifi is
+172.17.12.0/23), `tailscale0` 100.126.189.62. `ufw` inactive; nothing was listening on 8080.
+The web unit had never been installed.
+
+**Config change on the host** (`config/config.toml`, backup beside it as
+`config.toml.bak-2026-11-21-web`), all under `[web]`:
+- `host = "0.0.0.0"` (was 127.0.0.1)
+- `trusted_networks = ["100.64.0.0/10", "172.17.12.0/23"]` (Tailscale + station wifi)
+- `base_url = "http://100.126.189.62:8080"` (was 127.0.0.1, which is why the link in every
+  earlier Telegram alert opened nothing on a phone)
+
+Validated the config before touching services. Installed `deploy/systemd/vhfwatch-web.service`
+into `/etc/systemd/system/`, `daemon-reload`, `enable --now vhfwatch-web`: MainPID 43540,
+listening on 0.0.0.0:8080. Restarted `vhfwatch-pipeline` at 21:26 UTC so new alert links
+use the new `base_url`, but only after a Coast Guard pan-pan opener held at 21:20:28 had
+passed its 5-minute window (a restart drops held openers): MainPID 43659, `asr.warmed_up`
+2.7 s, capture started, "started" notice reached Telegram, no errors.
+
+**Checked:** `/marine1` answered 200 on the host at 127.0.0.1 and at its own Tailscale
+address, showing the next Bellingham tide, the live NWS forecast and the feed. From the Mac
+on the station wifi (`http://172.17.13.157:8080/marine1`) the page loaded 40 transmissions
+and a real recording played (muted).
+
+**Not yet verified:** opening it from a phone over Tailscale (the Mac was not on the
+tailnet), and a real alert whose link opens. Alerts sent before this change still link to
+127.0.0.1. Anyone on the station wifi or the tailnet can open the page and play recordings;
+never port-forward 8080 on the station router. To undo: `systemctl disable --now
+vhfwatch-web`, restore `config.toml.bak-2026-11-21-web`, restart the pipeline.
+
+---
+
 ### 2026-11-21, "anyone may qualify" deployed to the station host (D35 addendum)
 
 Moved the host's `/opt/vhfwatch` from `2e9fd73` to `7d61681` (fast-forward to `main`: PR 7, the
