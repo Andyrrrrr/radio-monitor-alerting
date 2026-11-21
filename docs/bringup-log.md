@@ -1547,6 +1547,38 @@ Telegram message delivered on the first attempt, no stalls or errors.
   the wifi card name (Device Manager), and a borrowed monitor and keyboard. Plan is
   Ubuntu Server 24.04 then deploy/README.md. Pipeline stopped for the day.
 
+### 2026-11-21, home-screen alerts deployed and tested on the operator's iPhone (D37)
+
+Merged PR 17 (the feature) and PR 18 (a fix found by the first real test); the host's
+`/opt/vhfwatch` is at `d88f158`. `pip install -e ".[linux]"` added the one new dependency,
+`pywebpush` 2.5.0. Both services restarted cleanly; the database migrated to version 2
+(`push_subscription`).
+
+**Done on the host:**
+- Tailscale: the operator turned on **HTTPS Certificates** in the admin console (MagicDNS was
+  already on); `sudo tailscale serve --bg 8080` now serves the app at
+  `https://vhfwatch.tail89b577.ts.net` with a valid certificate, tailnet-only (serve, not
+  funnel). Undo: `sudo tailscale serve --https=443 off`.
+- `VHFWATCH_VAPID_PRIVATE_KEY` generated on the host straight into `/etc/vhfwatch/vhfwatch.env`
+  (never printed; backup `vhfwatch.env.bak-2026-11-21-push`). Changing it means every phone
+  turns alerts on again.
+- `config/config.toml` (backup `config.toml.bak-2026-11-21-push`): `"webpush"` added to
+  `channels_critical` and `channels_urgent`; `[web] base_url` changed to the https address, so
+  Telegram alert links use it too. The VAPID contact is derived from it.
+
+**The first real test failed, then passed.** The iPhone subscribed on the first try, but
+**Send test alert** returned `VapidException: Missing 'sub'`: the signing library rejects a
+contact URL with a path, and every test had replaced the send call (D37 addendum,
+docs/conventions.md §12). After PR 18, two test alerts at 23:53:03 and 23:53:14 UTC were
+accepted by Apple's push service (`push.test_sent ok=True`) and arrived on the operator's
+locked iPhone.
+
+**Not yet verified:** a real urgent alert arriving on the icon (rare under the strict gate),
+and any second phone. Setup for others: Tailscale on, open the https address in Safari, Add to
+Home Screen, open Marine 1 from the icon, Turn on alerts, Send test alert.
+
+---
+
 ### 2026-11-21, the Marine 1 page turned on at the station host (D36)
 
 Merged PR 9 (previous bring-up entry) and PR 10 (the page), then fast-forwarded the host's
