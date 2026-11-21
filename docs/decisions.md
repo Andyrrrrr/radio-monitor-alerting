@@ -1355,3 +1355,30 @@ internet), user accounts (out of scope), a Telegram Mini App (needs a public add
 
 **Revisit when** the tailnet grows past the people who should hear the traffic, or someone
 needs access who cannot run Tailscale.
+
+## D37 — Urgent alerts also go to phones as home-screen web-app notifications
+
+**Decided 2026-11-21**, at the operator's request, to be tested on his iPhone first
+(docs/plans/2026-11-21-home-screen-push-alerts.md).
+
+**What.** The Marine 1 page can be added to an iPhone's home screen and, since iOS 16.4,
+receive standard Web Push notifications. A new `webpush` alert channel sends urgent and
+critical incidents to every phone that turned alerts on, beside Telegram, through the same
+router, dedupe and outbox. Health notices are not pushed (D33's reasoning: this sound should
+always mean a possible emergency).
+
+**Why not a native app.** Native apps are out of scope for the project, and a Swift app needs
+upkeep through every iOS release. Its one real advantage, Apple's Critical Alerts (ringing
+through Do Not Disturb), needs Apple's approval. Web push gets the icon and the ring without
+the App Store.
+
+**Costs, stated plainly.** One new dependency, `pywebpush` (the standard implementation of
+VAPID signing and payload encryption, which must not be hand-written). One new secret
+(`VHFWATCH_VAPID_PRIVATE_KEY`, env only). The web app must be reachable over HTTPS, which
+Tailscale provides tailnet-only (`tailscale serve`), and that puts the machine name in public
+certificate-transparency logs. Like Telegram, it cannot break through Do Not Disturb or Focus,
+and it needs the station's internet. A subscription the push service reports gone (404/410)
+is deleted and logged.
+
+**Revisit when** the iPhone test shows a problem, when people want Do Not Disturb to be broken
+through (that is the native-app question again), or when Android phones join.

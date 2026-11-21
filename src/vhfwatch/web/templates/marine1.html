@@ -28,6 +28,9 @@
   .msg-more { background: none; border: 0; padding: 0; margin-top: 0.2rem; font: inherit;
               font-size: 0.9rem; font-weight: 600; color: #2b8fc8; cursor: pointer; }
   .msg-pos { font-size: 0.95rem; margin: 0.45rem 0 0; }
+  .alerts-card { padding: 0.6rem 0.8rem; }
+  .alerts-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; }
+  .alerts-actions button[hidden] { display: none; }
   /* only the newest few messages until "Show more" (JS adds .collapsed; without
      JS every message shows) */
   #feed.collapsed .extra { display: none; }
@@ -59,6 +62,17 @@
 {% block content %}
 <h2 style="margin-top:0.6rem">Marine 1</h2>
 <p class="jump muted"><a href="#tides">Tides</a><a href="#weather">Weather</a><a href="#ch16">Channel 16</a><a href="#cams">Webcams</a></p>
+
+{# Home-screen alerts (docs/plans/2026-11-21-home-screen-push-alerts.md). The
+   script below fills this in for the phone it is on; without it, nothing shows. #}
+<div class="card alerts-card" id="alerts-card" hidden>
+  <div id="alerts-status" class="muted"></div>
+  <div class="alerts-actions">
+    <button type="button" id="alerts-on" hidden>Turn on alerts</button>
+    <button type="button" id="alerts-test" hidden>Send test alert</button>
+    <button type="button" id="alerts-off" hidden>Turn off</button>
+  </div>
+</div>
 
 {# -- warnings first: they are the reason to look at all ---------------- #}
 {% if forecast.value and forecast.value.alerts %}
@@ -273,6 +287,86 @@ often wrong, especially names, numbers and positions: when it matters, play the 
     es.onmessage = refresh;
   }
   setInterval(refresh, 60000);
+})();
+</script>
+<script>
+// Home-screen alerts for this phone: walks the person through what iOS needs
+// (secure address, added to the home screen, permission), then subscribes.
+(function () {
+  var card = document.getElementById("alerts-card");
+  var status = document.getElementById("alerts-status");
+  var btnOn = document.getElementById("alerts-on"), btnTest = document.getElementById("alerts-test"),
+      btnOff = document.getElementById("alerts-off");
+  var tq = {{ tq | tojson }}, secureUrl = {{ push_url | tojson }};
+  function show(html, on, test, off) {
+    card.hidden = false; status.innerHTML = html;
+    btnOn.hidden = !on; btnTest.hidden = !test; btnOff.hidden = !off;
+  }
+  function esc(t) { var d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+  if (!window.isSecureContext) {
+    if (secureUrl) show('For alerts on your phone, open <a href="' + secureUrl + '">' + esc(secureUrl) + "</a> (needs Tailscale).");
+    return;
+  }
+  if (!("serviceWorker" in navigator)) { show("This browser can't receive alerts."); return; }
+  var ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  var installed = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  navigator.serviceWorker.register("/sw.js").catch(function () {});
+  if (ios && !installed) {
+    show("For alerts on this iPhone: tap the Share button, choose <strong>Add to Home Screen</strong>, then open Marine 1 from the new icon.");
+    return;
+  }
+  if (!("PushManager" in window) || !("Notification" in window)) { show("This browser can't receive alerts."); return; }
+
+  function b64ToBytes(b64) {
+    var pad = "=".repeat((4 - b64.length % 4) % 4), raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+    var out = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  }
+  function post(path, body) {
+    return fetch(path + tq, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { j.httpOk = r.ok; return j; }); });
+  }
+  function label() {
+    var kind = ios ? "iPhone" : /Android/.test(navigator.userAgent) ? "Android" : "browser";
+    return kind + " added " + new Date().toLocaleDateString();
+  }
+  function refresh() {
+    navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (sub) {
+      if (sub && Notification.permission === "granted") show("Alerts are <strong>on</strong> for this phone. Only urgent calls ring.", false, true, true);
+      else if (Notification.permission === "denied") show("Notifications are blocked for Marine 1 on this device. Allow them in its settings (on an iPhone: Settings, Notifications, Marine 1), then reopen this page.");
+      else show("Get a notification on this phone when an urgent call comes in.", true, false, false);
+    });
+  }
+  btnOn.addEventListener("click", function () {
+    show("Asking for permission…");
+    Notification.requestPermission().then(function (perm) {
+      if (perm !== "granted") { refresh(); return null; }
+      return fetch("/push/key" + tq).then(function (r) { return r.json(); }).then(function (k) {
+        if (!k.publicKey) throw new Error(k.error || "the station has no alert key yet");
+        return navigator.serviceWorker.ready.then(function (reg) {
+          return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(k.publicKey) });
+        });
+      }).then(function (sub) { return post("/push/subscribe", { subscription: sub.toJSON(), label: label() }); })
+        .then(function (res) { if (!res.httpOk) throw new Error(res.detail || "the station refused the subscription"); refresh(); });
+    }).catch(function (e) { show("Couldn't turn on alerts: " + esc(e.message || String(e)), true, false, false); });
+  });
+  btnTest.addEventListener("click", function () {
+    show("Sending a test alert…", false, true, true);
+    navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (sub) {
+      return post("/push/test", { endpoint: sub.endpoint });
+    }).then(function (res) {
+      show(res.ok ? "Test alert sent: it should arrive in a few seconds (lock the phone to see it ring)."
+                  : "Test failed: " + esc(res.detail || "unknown error"), false, true, true);
+    }).catch(function (e) { show("Test failed: " + esc(e.message || String(e)), false, true, true); });
+  });
+  btnOff.addEventListener("click", function () {
+    navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (sub) {
+      if (!sub) return null;
+      return post("/push/unsubscribe", { endpoint: sub.endpoint }).then(function () { return sub.unsubscribe(); });
+    }).then(refresh).catch(refresh);
+  });
+  refresh();
 })();
 </script>
 {% endblock %}

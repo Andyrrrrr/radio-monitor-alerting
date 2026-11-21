@@ -218,6 +218,15 @@ silent_health = true   # health notices arrive without a sound
 # a chat muted on the phone silences the alerts too, so leave it unmuted.
 silent_transmissions = true
 
+[alerting.webpush]
+# Home-screen alerts on phones that added the Marine 1 page to the home screen
+# (docs/plans/2026-11-21-home-screen-push-alerts.md). To use: add "webpush" to
+# channels_critical and channels_urgent above, set VHFWATCH_VAPID_PRIVATE_KEY
+# (generate with `python -m vhfwatch.alerting.webpush`), and serve the web app
+# over HTTPS (deploy/README.md). Incidents only: health notices stay in Telegram.
+vapid_subject = "https://github.com/Andyrrrrr/radio-monitor-alerting"   # a URL, never an email
+ttl_s         = 3600
+
 [alerting.pushover]
 priority_critical = 2          # emergency: bypasses DND, re-alerts until acked
 priority_urgent   = 1

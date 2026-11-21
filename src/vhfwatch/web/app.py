@@ -38,8 +38,15 @@ from fastapi.responses import (
     RedirectResponse,
     StreamingResponse,
 )
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from vhfwatch.alerting.webpush import (
+    load_vapid,
+    public_key_b64,
+    send_one,
+    subscription_info,
+)
 from vhfwatch.audio.encode import playback_path_for
 from vhfwatch.config import Settings
 from vhfwatch.detect.hallucination import gate_transcript
@@ -52,6 +59,7 @@ from vhfwatch.web.tokens import verify_token
 logger = structlog.get_logger(__name__)
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
+_STATIC_DIR = Path(__file__).parent / "static"
 
 # Presentation thresholds for honest uncertainty rendering. Display-only —
 # they change how words look, never what is stored or matched.
@@ -105,6 +113,10 @@ def _today_and_tonight(periods: list[tuple[str, str]]) -> list[tuple[str, str]]:
 def create_app(cfg: Settings, conditions: Conditions | None = None) -> FastAPI:
     app = FastAPI(title="vhf-watch", docs_url=None, redoc_url=None)
     templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
+    # Icons and the service worker: nothing secret, so no access check
+    # (iOS fetches the icon and manifest while adding the page).
+    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+    vapid = load_vapid()  # None until VHFWATCH_VAPID_PRIVATE_KEY is set
     db = Database(cfg.general.data_dir / "vhfwatch.db", allow_threads=True)
     db.migrate()
     trusted = [ipaddress.ip_network(n, strict=False) for n in cfg.web.trusted_networks]
@@ -240,6 +252,123 @@ def create_app(cfg: Settings, conditions: Conditions | None = None) -> FastAPI:
 
         return StreamingResponse(stream(), media_type="text/event-stream")
 
+    # -- home-screen app and alerts ----------------------------------------
+    # docs/plans/2026-11-21-home-screen-push-alerts.md
+
+    @app.get("/manifest.webmanifest")
+    def manifest() -> JSONResponse:
+        return JSONResponse(
+            {
+                "name": "Marine 1",
+                "short_name": "Marine 1",
+                "start_url": "/marine1",
+                "scope": "/",
+                "display": "standalone",
+                "background_color": "#0b2a45",
+                "theme_color": "#0b2a45",
+                "icons": [
+                    {
+                        "src": "/static/icon-192.png",
+                        "sizes": "192x192",
+                        "type": "image/png",
+                    },
+                    {
+                        "src": "/static/icon-512.png",
+                        "sizes": "512x512",
+                        "type": "image/png",
+                    },
+                ],
+            },
+            media_type="application/manifest+json",
+        )
+
+    @app.get("/sw.js")
+    def service_worker() -> FileResponse:
+        # Served from the root so it covers the whole site; never cached, so
+        # a fix reaches phones on their next visit.
+        return FileResponse(
+            _STATIC_DIR / "sw.js",
+            media_type="application/javascript",
+            headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"},
+        )
+
+    @app.get("/push/key")
+    def push_key(request: Request) -> JSONResponse:
+        authorize(request, None)
+        if vapid is None:
+            return JSONResponse(
+                {"error": "alerts are not set up on the station"}, status_code=503
+            )
+        return JSONResponse({"publicKey": public_key_b64(vapid)})
+
+    def _subscription_from(body: Any) -> tuple[str, str, str]:
+        sub = body.get("subscription") if isinstance(body, dict) else None
+        keys = sub.get("keys") if isinstance(sub, dict) else None
+        endpoint = sub.get("endpoint") if isinstance(sub, dict) else None
+        if not (
+            isinstance(endpoint, str)
+            and endpoint.startswith("https://")
+            and isinstance(keys, dict)
+            and isinstance(keys.get("p256dh"), str)
+            and isinstance(keys.get("auth"), str)
+        ):
+            raise HTTPException(status_code=400, detail="not a push subscription")
+        return endpoint, keys["p256dh"], keys["auth"]
+
+    @app.post("/push/subscribe")
+    async def push_subscribe(request: Request) -> JSONResponse:
+        authorize(request, None)
+        body = await request.json()
+        endpoint, p256dh, auth = _subscription_from(body)
+        label = str(body.get("label") or "phone")[:60]
+        db.upsert_push_subscription(endpoint, p256dh, auth, label)
+        logger.info("push.subscribed", label=label)
+        return JSONResponse({"ok": True})
+
+    @app.post("/push/unsubscribe")
+    async def push_unsubscribe(request: Request) -> JSONResponse:
+        authorize(request, None)
+        body = await request.json()
+        endpoint = body.get("endpoint") if isinstance(body, dict) else None
+        removed = isinstance(endpoint, str) and db.delete_push_subscription(endpoint)
+        logger.info("push.unsubscribed", removed=removed)
+        return JSONResponse({"ok": True})
+
+    @app.post("/push/test")
+    async def push_test(request: Request) -> JSONResponse:
+        """A test notification to the one phone that asked: proves the whole
+        path (key, subscription, Apple's push service, the phone) without
+        waiting for a real emergency or ringing anyone else."""
+        authorize(request, None)
+        if vapid is None:
+            return JSONResponse(
+                {"ok": False, "detail": "alerts are not set up on the station"},
+                status_code=503,
+            )
+        body = await request.json()
+        endpoint = body.get("endpoint") if isinstance(body, dict) else None
+        row = next(
+            (r for r in db.list_push_subscriptions() if r["endpoint"] == endpoint), None
+        )
+        if row is None:
+            raise HTTPException(status_code=404, detail="this phone is not subscribed")
+        ok, gone, detail = await asyncio.to_thread(
+            send_one,
+            vapid,
+            cfg.alerting.webpush,
+            subscription_info(row),
+            {
+                "title": "Marine 1 test alert",
+                "body": "Alerts are working on this phone. Real alerts come only for urgent calls.",
+                "url": "/marine1",
+                "tag": "marine1-test",
+            },
+        )
+        if gone:
+            db.delete_push_subscription(row["endpoint"])
+        logger.info("push.test_sent", ok=ok, detail=detail)
+        return JSONResponse({"ok": ok, "detail": detail})
+
     # -- Marine 1 page -----------------------------------------------------
 
     def token_query(request: Request) -> str:
@@ -346,6 +475,12 @@ def create_app(cfg: Settings, conditions: Conditions | None = None) -> FastAPI:
                 "chart": chart,
                 "feed": feed_items(request),
                 "visible": dash.feed_visible,
+                # The secure address alerts need (iPhones refuse plain http).
+                "push_url": (
+                    cfg.web.base_url.rstrip("/") + "/marine1"
+                    if cfg.web.base_url.startswith("https://")
+                    else None
+                ),
                 "tq": token_query(request),
                 "token": request.query_params.get("token", ""),
                 "stations": stations,

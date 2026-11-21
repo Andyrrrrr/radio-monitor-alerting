@@ -23,6 +23,7 @@ from vhfwatch.alerting.console import ConsoleAlertChannel
 from vhfwatch.alerting.macos import MacOSAlertChannel
 from vhfwatch.alerting.pushover import PushoverAlertChannel
 from vhfwatch.alerting.telegram import TelegramAlertChannel
+from vhfwatch.alerting.webpush import PushStore, WebPushAlertChannel
 from vhfwatch.config import AlertingConfig
 from vhfwatch.models import AlertResult, Incident, Severity
 
@@ -128,7 +129,10 @@ class AlertRouter:
 
 
 def create_channels(
-    cfg: AlertingConfig, local_timezone: str, link_for: LinkBuilder
+    cfg: AlertingConfig,
+    local_timezone: str,
+    link_for: LinkBuilder,
+    push_store: PushStore | None = None,
 ) -> dict[str, AlertChannel]:
     """Build every channel named anywhere in the routing config.
 
@@ -156,6 +160,14 @@ def create_channels(
         elif name == "pushover":
             channels[name] = PushoverAlertChannel(
                 cfg.pushover, local_timezone, link_for
+            )
+        elif name == "webpush":
+            if push_store is None:
+                # Needs the database for the phones' subscriptions.
+                logger.warning("alert.webpush_needs_store", channel=name)
+                continue
+            channels[name] = WebPushAlertChannel(
+                cfg.webpush, local_timezone, link_for, push_store
             )
         else:
             logger.warning("alert.unknown_channel", channel=name)

@@ -229,6 +229,18 @@ class TelegramConfig(_Section):
     silent_transmissions: bool = True
 
 
+class WebPushConfig(_Section):
+    """Home-screen alerts (docs/plans/2026-11-21-home-screen-push-alerts.md).
+    The VAPID private key is a secret: env only, VHFWATCH_VAPID_PRIVATE_KEY."""
+
+    # Who runs this sender, as the push services ask. A URL, never a person's
+    # email: the repo is public.
+    vapid_subject: str = "https://github.com/Andyrrrrr/radio-monitor-alerting"
+    ttl_s: int = (
+        3600  # an alert nobody received within an hour is not worth a late ring
+    )
+
+
 class AlertingConfig(_Section):
     channels_critical: list[str] = ["console", "macos", "pushover"]
     channels_urgent: list[str] = ["console", "macos", "pushover"]
@@ -253,6 +265,7 @@ class AlertingConfig(_Section):
     dedupe_window_s: int = 300
     pushover: PushoverConfig = PushoverConfig()
     telegram: TelegramConfig = TelegramConfig()
+    webpush: WebPushConfig = WebPushConfig()
 
 
 class TideStation(_Section):

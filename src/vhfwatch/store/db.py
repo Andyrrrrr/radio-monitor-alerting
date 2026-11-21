@@ -26,6 +26,23 @@ logger = structlog.get_logger(__name__)
 # Append new (version, sql) entries — never edit a shipped one.
 _MIGRATIONS: list[tuple[int, str]] = [
     (1, resources.files("vhfwatch.store").joinpath("schema.sql").read_text()),
+    # 2: phones that turned on home-screen alerts (Web Push). IF NOT EXISTS
+    # because the pipeline and the web app can both start at boot and race
+    # to migrate. Operational
+    # state, not evidence: a row is removed when the push service says the
+    # phone is gone, so this table is deliberately not append-only.
+    (
+        2,
+        """
+        CREATE TABLE IF NOT EXISTS push_subscription (
+            endpoint   TEXT PRIMARY KEY,
+            p256dh     TEXT NOT NULL,
+            auth       TEXT NOT NULL,
+            label      TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        """,
+    ),
 ]
 
 
@@ -146,6 +163,35 @@ class Database:
             (limit,),
         )
         return list(cur.fetchall())
+
+    # -- push subscriptions (home-screen alerts) --------------------------
+
+    def upsert_push_subscription(
+        self, endpoint: str, p256dh: str, auth: str, label: str
+    ) -> None:
+        """Store a phone's push subscription; the same phone re-enabling
+        alerts replaces its keys rather than adding a second row."""
+        with self._conn:
+            self._conn.execute(
+                """
+                INSERT INTO push_subscription (endpoint, p256dh, auth, label, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (endpoint) DO UPDATE SET
+                    p256dh = excluded.p256dh, auth = excluded.auth, label = excluded.label
+                """,
+                (endpoint, p256dh, auth, label, _iso(datetime.now(UTC))),
+            )
+
+    def list_push_subscriptions(self) -> list[sqlite3.Row]:
+        cur = self._conn.execute("SELECT * FROM push_subscription ORDER BY created_at")
+        return list(cur.fetchall())
+
+    def delete_push_subscription(self, endpoint: str) -> bool:
+        with self._conn:
+            cur = self._conn.execute(
+                "DELETE FROM push_subscription WHERE endpoint = ?", (endpoint,)
+            )
+        return cur.rowcount > 0
 
     # -- transcripts -----------------------------------------------------
 
