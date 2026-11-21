@@ -1,6 +1,6 @@
 # Plan: urgent alerts on the iPhone home screen (Marine 1 as a web app)
 
-Status: built on branch `home-screen-push` 2026-11-21 (tests pass; manifest, service worker and endpoints checked locally). Not deployed; the end-to-end test on the operator's iPhone is next.
+Status: implemented and deployed 2026-11-21; test alerts arrived on the operator's iPhone after one fix (D37 addendum). A real urgent alert on the icon is not yet seen.
 
 ## 1. What we're building and why
 
