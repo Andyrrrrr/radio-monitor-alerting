@@ -133,6 +133,7 @@ def create_channels(
     local_timezone: str,
     link_for: LinkBuilder,
     push_store: PushStore | None = None,
+    push_subject: str = "",
 ) -> dict[str, AlertChannel]:
     """Build every channel named anywhere in the routing config.
 
@@ -167,7 +168,7 @@ def create_channels(
                 logger.warning("alert.webpush_needs_store", channel=name)
                 continue
             channels[name] = WebPushAlertChannel(
-                cfg.webpush, local_timezone, link_for, push_store
+                cfg.webpush, local_timezone, link_for, push_store, push_subject
             )
         else:
             logger.warning("alert.unknown_channel", channel=name)

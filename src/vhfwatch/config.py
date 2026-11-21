@@ -17,6 +17,7 @@ them land — never add a secret to the TOML schema.
 """
 
 import ipaddress
+import re
 import tomllib
 from pathlib import Path
 from typing import Literal, Self
@@ -233,12 +234,25 @@ class WebPushConfig(_Section):
     """Home-screen alerts (docs/plans/2026-11-21-home-screen-push-alerts.md).
     The VAPID private key is a secret: env only, VHFWATCH_VAPID_PRIVATE_KEY."""
 
-    # Who runs this sender, as the push services ask. A URL, never a person's
-    # email: the repo is public.
-    vapid_subject: str = "https://github.com/Andyrrrrr/radio-monitor-alerting"
-    ttl_s: int = (
-        3600  # an alert nobody received within an hour is not worth a late ring
-    )
+    # Who runs this sender, as the push services ask. Empty = this station's own
+    # https address, from [web] base_url. If set: "mailto:..." or a bare
+    # "https://host" with NO path; the signing library rejects anything else,
+    # and until this check it did so only at send time (D37 addendum). Never a
+    # person's email in the committed example: the repo is public.
+    vapid_subject: str = ""
+    # An alert nobody received within an hour is not worth a late ring.
+    ttl_s: int = 3600
+
+    @model_validator(mode="after")
+    def _subject_form(self) -> Self:
+        s = self.vapid_subject
+        if s and not (
+            s.startswith("mailto:") or re.fullmatch(r"https://[A-Za-z0-9.-]+", s)
+        ):
+            raise ValueError(
+                f"vapid_subject {s!r} must be mailto:... or https://host with no path"
+            )
+        return self
 
 
 class AlertingConfig(_Section):

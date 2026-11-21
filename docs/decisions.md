@@ -1382,3 +1382,17 @@ is deleted and logged.
 
 **Revisit when** the iPhone test shows a problem, when people want Do Not Disturb to be broken
 through (that is the native-app question again), or when Android phones join.
+
+### D37 addendum 2026-11-21: the first real test failed on the VAPID contact
+
+The operator's iPhone subscribed correctly, but **Send test alert** failed before anything
+reached Apple: `VapidException: Missing 'sub'`. The signing library (`py_vapid`) accepts the
+contact only as `mailto:...` or a bare `https://host`; the default was the repository's
+GitHub URL, which has a path, and was rejected. Every test had replaced `webpush()` itself,
+so none ran that check.
+
+**Fixed:** `vapid_subject` now defaults to empty, meaning this station's own https origin
+from `[web] base_url` (`https://vhfwatch.tail89b577.ts.net`), and a set value is validated at
+config load, so a bad one stops startup instead of the first alert. A new test runs the real
+signing and encryption with only the HTTP POST faked; it fails on the old value. The rule
+went into docs/conventions.md §12.

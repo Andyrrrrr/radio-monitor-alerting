@@ -9,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import pydantic
 import pytest
 from py_vapid import Vapid02
 from pywebpush import WebPushException
@@ -90,7 +91,11 @@ def test_migrating_twice_is_harmless(db: Database) -> None:
 
 def _channel(db: Database) -> wp.WebPushAlertChannel:
     return wp.WebPushAlertChannel(
-        WebPushConfig(), "America/Los_Angeles", lambda inc: f"https://x/i/{inc.id}", db
+        WebPushConfig(),
+        "America/Los_Angeles",
+        lambda inc: f"https://x/i/{inc.id}",
+        db,
+        "https://station.example",
     )
 
 
@@ -163,7 +168,9 @@ def test_health_notices_are_never_pushed(
 
 def test_router_builds_the_channel_only_with_a_store(db: Database, key: str) -> None:
     cfg = AlertingConfig(channels_critical=["webpush"], channels_urgent=["webpush"])
-    assert "webpush" in create_channels(cfg, "UTC", lambda inc: None, push_store=db)
+    assert "webpush" in create_channels(
+        cfg, "UTC", lambda inc: None, push_store=db, push_subject="https://s.example"
+    )
     assert "webpush" not in create_channels(cfg, "UTC", lambda inc: None)
 
 
@@ -235,3 +242,76 @@ def test_untrusted_callers_cannot_subscribe(cfg: Settings, key: str) -> None:
     with _client(cfg, host="203.0.113.9") as c:
         assert c.post("/push/subscribe", json={"subscription": SUB}).status_code == 403
         assert c.get("/push/key").status_code == 403
+
+
+# -- the VAPID contact ("sub") and real signing (the 2026-11-21 test failure) ----
+
+
+def test_contact_defaults_to_the_stations_own_https_origin() -> None:
+    assert (
+        wp.vapid_subject(WebPushConfig(), "https://vhfwatch.tail89b577.ts.net")
+        == "https://vhfwatch.tail89b577.ts.net"
+    )
+    assert wp.vapid_subject(WebPushConfig(), "http://127.0.0.1:8080") == ""
+
+
+def test_a_contact_url_with_a_path_is_refused_at_startup() -> None:
+    # The library only accepts mailto: or https://host; a path failed at send time.
+    with pytest.raises(pydantic.ValidationError, match="no path"):
+        WebPushConfig(
+            vapid_subject="https://github.com/Andyrrrrr/radio-monitor-alerting"
+        )
+    WebPushConfig(vapid_subject="https://github.com")  # bare host is fine
+
+
+def test_real_signing_and_encryption_with_only_the_network_faked(
+    key: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No stand-in for webpush(): VAPID signing and payload encryption run for
+    real against a freshly generated phone key; only the HTTP POST is faked."""
+    import os
+
+    import pywebpush
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    phone = ec.generate_private_key(ec.SECP256R1())
+    p256dh = (
+        base64.urlsafe_b64encode(
+            phone.public_key().public_bytes(
+                serialization.Encoding.X962,
+                serialization.PublicFormat.UncompressedPoint,
+            )
+        )
+        .rstrip(b"=")
+        .decode()
+    )
+    auth = base64.urlsafe_b64encode(os.urandom(16)).rstrip(b"=").decode()
+    posted: list[dict[str, Any]] = []
+
+    def fake_post(url: str, **kw: Any) -> Any:
+        posted.append({"url": url, **kw})
+        return SimpleNamespace(status_code=201, text="", headers={})
+
+    monkeypatch.setattr(pywebpush.requests, "post", fake_post)
+    vapid = wp.load_vapid()
+    assert vapid is not None
+    ok, gone, detail = wp.send_one(
+        vapid,
+        WebPushConfig(),
+        wp.vapid_subject(WebPushConfig(), "https://vhfwatch.tail89b577.ts.net"),
+        {
+            "endpoint": "https://web.push.apple.com/abc",
+            "keys": {"p256dh": p256dh, "auth": auth},
+        },
+        {"title": "t", "body": "b", "url": "/marine1", "tag": "x"},
+    )
+    assert ok and not gone, detail
+    assert posted and posted[0]["headers"]["Authorization"].startswith("vapid t=")
+
+
+def test_no_contact_means_the_channel_says_so(db: Database, key: str) -> None:
+    channel = wp.WebPushAlertChannel(WebPushConfig(), "UTC", lambda inc: None, db, "")
+    db.upsert_push_subscription("https://push.example/a", "p", "a", "one")
+    result = asyncio.run(channel.send(_incident(), is_update=False))
+    assert not result.ok and "subject" in result.detail

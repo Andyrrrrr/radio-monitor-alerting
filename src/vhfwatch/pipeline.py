@@ -45,6 +45,7 @@ import structlog
 
 from vhfwatch.alerting import AlertRouter, create_channels
 from vhfwatch.alerting.outbox import OutageSummary, Outbox
+from vhfwatch.alerting.webpush import vapid_subject
 from vhfwatch.asr import Transcriber, create_transcriber
 from vhfwatch.audio.encode import archive_audio, playback_path_for
 from vhfwatch.audio.resample import ResamplingAudioSource
@@ -177,6 +178,7 @@ async def run(
                 cfg.general.local_timezone,
                 link_for=lambda inc: mint_share_link(db, cfg.web, inc.id),
                 push_store=db,
+                push_subject=vapid_subject(cfg.alerting.webpush, cfg.web.base_url),
             )
             router = AlertRouter(cfg.alerting, channels)
 
