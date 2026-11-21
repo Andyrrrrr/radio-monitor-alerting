@@ -46,6 +46,7 @@ from vhfwatch.alerting.webpush import (
     public_key_b64,
     send_one,
     subscription_info,
+    vapid_subject,
 )
 from vhfwatch.audio.encode import playback_path_for
 from vhfwatch.config import Settings
@@ -356,6 +357,7 @@ def create_app(cfg: Settings, conditions: Conditions | None = None) -> FastAPI:
             send_one,
             vapid,
             cfg.alerting.webpush,
+            vapid_subject(cfg.alerting.webpush, cfg.web.base_url),
             subscription_info(row),
             {
                 "title": "Marine 1 test alert",

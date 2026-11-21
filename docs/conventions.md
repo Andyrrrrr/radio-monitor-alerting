@@ -141,3 +141,13 @@ existing `config.toml` that still contains it fail at startup, including the sta
 host's. A key nothing reads (`storage.playback_codec`, found in the 2026-11-02 cleanup)
 stays until the same change also removes it from each live `config.toml`, or the model
 is taught to ignore it. Never remove one as a drive-by cleanup.
+
+## 12. Test the real library path at least once
+
+When code hands work to a third-party library (signing, encryption, a protocol), the
+tests may stub the network, but **at least one test must run the library's own code
+path** with only the final network call faked. Stubbing the whole library call hides
+the library's own validation: on 2026-11-21 every Web Push test passed with `webpush()`
+replaced, and the first real send on an iPhone failed because the signing library
+rejects a contact URL with a path (D37 addendum). Validate such inputs at config load
+too, so a bad value stops startup instead of the first alert.

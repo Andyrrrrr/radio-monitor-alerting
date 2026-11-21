@@ -224,7 +224,7 @@ silent_transmissions = true
 # channels_critical and channels_urgent above, set VHFWATCH_VAPID_PRIVATE_KEY
 # (generate with `python -m vhfwatch.alerting.webpush`), and serve the web app
 # over HTTPS (deploy/README.md). Incidents only: health notices stay in Telegram.
-vapid_subject = "https://github.com/Andyrrrrr/radio-monitor-alerting"   # a URL, never an email
+vapid_subject = ""   # empty = this station's https address ([web] base_url); else mailto:... or https://host, no path
 ttl_s         = 3600
 
 [alerting.pushover]

@@ -22,6 +22,7 @@ import json
 import os
 import sqlite3
 from typing import Any, Protocol
+from urllib.parse import urlsplit
 
 import structlog
 from cryptography.hazmat.primitives import serialization
@@ -62,9 +63,22 @@ def public_key_b64(vapid: Vapid02) -> str:
     return base64.urlsafe_b64encode(point).rstrip(b"=").decode()
 
 
+def vapid_subject(cfg: WebPushConfig, base_url: str) -> str:
+    """The VAPID "sub" contact: the configured one, else this station's own
+    https origin (`https://host`, no path, the only URL form the signing
+    library accepts). Empty when neither is available."""
+    if cfg.vapid_subject:
+        return cfg.vapid_subject
+    parts = urlsplit(base_url)
+    if parts.scheme == "https" and parts.hostname:
+        return f"https://{parts.hostname}"
+    return ""
+
+
 def send_one(
     vapid: Vapid02,
     cfg: WebPushConfig,
+    subject: str,
     subscription: dict[str, Any],
     payload: dict[str, str],
 ) -> tuple[bool, bool, str]:
@@ -75,7 +89,8 @@ def send_one(
             subscription_info=subscription,
             data=json.dumps(payload),
             vapid_private_key=vapid,
-            vapid_claims={"sub": cfg.vapid_subject},
+            # A fresh dict every send: pywebpush adds aud/exp to it.
+            vapid_claims={"sub": subject},
             ttl=cfg.ttl_s,
             headers={"Urgency": "high"},
             timeout=10,
@@ -104,8 +119,10 @@ class WebPushAlertChannel:
         local_timezone: str,
         link_for: LinkBuilder,
         store: PushStore,
+        subject: str,
     ) -> None:
         self._cfg = cfg
+        self._subject = subject
         self._tz = local_timezone
         self._link_for = link_for
         self._store = store
@@ -115,11 +132,20 @@ class WebPushAlertChannel:
                 "alert.webpush_unconfigured",
                 hint=f"set {_KEY_ENV} to send home-screen alerts",
             )
+        if not subject:
+            logger.warning(
+                "alert.webpush_no_subject",
+                hint="set [web] base_url to the https address, or vapid_subject",
+            )
 
     async def send(self, incident: Incident, is_update: bool) -> AlertResult:
         if self._vapid is None:
             return AlertResult(
                 channel=self.name, ok=False, detail="VAPID key not configured"
+            )
+        if not self._subject:
+            return AlertResult(
+                channel=self.name, ok=False, detail="no VAPID subject configured"
             )
         subs = self._store.list_push_subscriptions()
         if not subs:
@@ -138,7 +164,12 @@ class WebPushAlertChannel:
         results = await asyncio.gather(
             *(
                 asyncio.to_thread(
-                    send_one, vapid, self._cfg, subscription_info(s), payload
+                    send_one,
+                    vapid,
+                    self._cfg,
+                    self._subject,
+                    subscription_info(s),
+                    payload,
                 )
                 for s in subs
             )
@@ -175,7 +206,7 @@ class WebPushAlertChannel:
         )
 
     async def healthcheck(self) -> bool:
-        return self._vapid is not None
+        return self._vapid is not None and bool(self._subject)
 
 
 def _generate_key() -> None:
