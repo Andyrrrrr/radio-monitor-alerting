@@ -1547,6 +1547,54 @@ Telegram message delivered on the first attempt, no stalls or errors.
   the wifi card name (Device Manager), and a borrowed monitor and keyboard. Plan is
   Ubuntu Server 24.04 then deploy/README.md. Pipeline stopped for the day.
 
+### 2026-11-21, "anyone may qualify" deployed to the station host (D35 addendum)
+
+Moved the host's `/opt/vhfwatch` from `2e9fd73` to `7d61681` (fast-forward to `main`: PR 7, the
+bring-up log and corrected D35 numbers, and PR 8, the code change). Git ran as
+`sudo -u vhfwatch`. Untracked on the host before and after: `.cache/` and the config backups.
+
+**Why.** On 2026-11-14 (Saturday) a sailboat fire in Bellingham Bay rang at 16:20:26 local via
+the Coast Guard's own broadcast, but the vessel had called "Pan-pan x3" at 16:13:49 and named
+the south entrance to Squalicum Harbor at 16:14:45. The gate held both because neither was a
+Coast Guard transmission: the first ring came 6 min 37 s after the vessel's call. Replay over
+960 transcripts (Sep 7 to Nov 21): 12 rings with the Coast Guard required, 13 without, the extra
+one being that fire 5.7 min earlier, and no false alarm added (D35 addendum 2026-11-21).
+
+**Config change on the host** (`config/config.toml`, backup beside it as
+`config.toml.bak-2026-11-21`): added `urgent_speaker_phrases = []` under `[detect]`, right after
+the `strict_urgent` line. Empty means anyone may qualify. The code default is still
+`["coast guard"]`, so this line is what turns it on. Everything else unchanged
+(`strict_window_s = 300`, place lists from `config/places.example.toml`).
+
+Checked before restarting: no held pan-pan openers in the previous 6 minutes (the held state is
+in memory and a restart drops it); the config loads and the place lists load. Restarted
+`vhfwatch-pipeline` at 20:59 UTC: one process (MainPID 42788), `asr.warmed_up` in 2.7 s, capture
+started on `USB Audio CODEC` at 48 kHz with `use_channel=0`, the "started" notice reached console
+and Telegram, no errors. Then replayed Saturday's sequence offline through the host's own code and
+config (no database writes, live service untouched): a vessel pan-pan with no place stayed at
+WATCH, "Entering the south entrance to Squalicum Harbor" 56 s later escalated it to URGENT as a
+`window` detection, and a boat naming Squalicum Harbor alone did nothing.
+
+**Not yet verified live:** the first real vessel pan-pan or mayday followed by an in-zone place.
+It will show as `detection.window_escalation` in the log. The cost to watch for is chatter: a
+casual "mayday" plus an unrelated boat naming an in-zone place within 5 minutes now rings.
+To undo: set `urgent_speaker_phrases = ["coast guard"]` (or restore the backup) and restart.
+
+**What the host log showed for 2026-11-02 to 2026-11-21 (19 days, Coast Guard rule):** 7 window
+escalations and 8 phone alerts for 5 real events (11-07 San Juan Island, 11-08 Ship Harbor,
+11-10 Fairhaven, 11-12 an unmanned kayak near Deer Harbor, rebroadcast three times and later
+cancelled, 11-14 the Bellingham Bay fire); 48 held back (40 no in-zone place, 7 not Coast Guard,
+1 no mayday/pan-pan wording) and 1 Victoria cap. Six rebroadcasts of an unmanned boat outside
+Mystery Bay (out of the zone) were correctly held. Telegram had short outages on 11-14, 11-17 and
+11-19 (sends timed out or returned Bad Gateway); the outbox retried and nothing was abandoned.
+The log also shows a start at 04:10 UTC on 11-13 with no preceding stop (consistent with a power
+loss and the host coming back on its own) and a stop/start at 06:28 UTC the same day. Open items
+seen in the same stretch: the incident link in each alert points at `127.0.0.1:8080`, so it does
+nothing on a phone, and a one-second "Man overboard." on 11-14 at 15:03 local was held for lacking
+the mayday/pan-pan wording (not checked against the audio).
+
+---
+
 ### 2026-11-02, strict urgent gate (D35) deployed to the station host
 
 Switched the host's `/opt/vhfwatch` from `parker-hardware-setup` (`43bad08`) to `main` and
