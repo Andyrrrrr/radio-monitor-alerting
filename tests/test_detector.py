@@ -318,8 +318,16 @@ class Clock:
         self.now += timedelta(seconds=seconds)
 
 
-def make_window_detector(window_s: float = 300.0) -> tuple[Detector, Clock]:
-    cfg = DetectConfig(strict_urgent=True, strict_window_s=window_s)
+def make_window_detector(
+    window_s: float = 300.0, speakers: list[str] | None = None
+) -> tuple[Detector, Clock]:
+    cfg = DetectConfig(
+        strict_urgent=True,
+        strict_window_s=window_s,
+        urgent_speaker_phrases=(
+            DetectConfig().urgent_speaker_phrases if speakers is None else speakers
+        ),
+    )
     clock = Clock()
     detector = Detector(
         cfg,
@@ -427,3 +435,58 @@ def test_the_window_is_off_when_the_gate_is_off() -> None:
     )
     first = feed(detector, OPENER)
     assert first is not None and first.severity is Severity.URGENT
+
+
+# -- no speaker requirement: urgent_speaker_phrases = [] ------------------------
+
+
+def test_a_vessels_own_pan_pan_then_a_place_escalates_when_anyone_may_qualify() -> None:
+    # Saturday 2026-11-14: the vessel called pan-pan at 16:13, named Squalicum
+    # Harbor 56 seconds later, and the Coast Guard's own broadcast came at 16:20.
+    detector, clock = make_window_detector(speakers=[])
+    first = feed(detector, "Pan-pan, pan-pan, pan-pan, sailing vessel, Annabella.")
+    assert first is not None and first.severity is Severity.WATCH
+    clock.advance(20)
+    assert feed(detector, "Sailing vessel, what is your position, over?") is None
+    clock.advance(36)
+    second = feed(
+        detector,
+        "Three persons on board. Entering the south entrance to Squalicum Harbor.",
+    )
+    assert second is not None
+    assert second.severity is Severity.URGENT
+    assert second.tier == "window"
+
+
+def test_a_vessel_pan_pan_naming_its_place_at_once_rings_when_anyone_may_qualify() -> (
+    None
+):
+    detector, _ = make_window_detector(speakers=[])
+    d = feed(
+        detector,
+        "Pan-pan, pan-pan, pan-pan, this is Serenity, aground off Lummi Island",
+    )
+    assert d is not None and d.severity is Severity.URGENT
+
+
+def test_a_casual_mayday_with_no_place_still_rates_watch_when_anyone_may_qualify() -> (
+    None
+):
+    detector, _ = make_window_detector(speakers=[])
+    d = feed(
+        detector,
+        "Okay, mayday, switch up to channel 83 alpha, come back to channel 16.",
+    )
+    assert d is not None and d.severity is Severity.WATCH
+
+
+def test_a_place_with_no_call_before_it_never_rings_when_anyone_may_qualify() -> None:
+    detector, _ = make_window_detector(speakers=[])
+    assert feed(detector, "We are inbound Squalicum Harbor to the fuel dock") is None
+
+
+def test_victoria_still_blocks_when_anyone_may_qualify() -> None:
+    detector, clock = make_window_detector(speakers=[])
+    feed(detector, "Pan-pan, pan-pan, pan-pan, this is Victoria traffic")
+    clock.advance(30)
+    assert feed(detector, "vessel near Orcas Island") is None
