@@ -18,6 +18,7 @@ forecast as the National Weather Service's, and shows when each was fetched.
 """
 
 import asyncio
+import math
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -90,6 +91,10 @@ class Conditions:
 
     # -- public ------------------------------------------------------------
 
+    def now(self) -> datetime:
+        """The clock tides are judged against (injectable for tests)."""
+        return self._clock()
+
     async def tides(self, station_id: str) -> Fetched[list[TideEvent]]:
         return await self._cached(
             f"tides:{station_id}",
@@ -160,10 +165,13 @@ class Conditions:
             "interval": "hilo",
             "units": "english",
             "format": "json",
-            # From local midnight, 48 h: today and tomorrow. ("date=today"
-            # would ignore the range and stop at midnight.)
-            "begin_date": self._clock().astimezone(self._tz).strftime("%Y%m%d"),
-            "range": "48",
+            # From yesterday's local midnight, 96 h: the page shows today and
+            # tomorrow, and the curve needs the high/low on each side of that
+            # window to draw its ends. ("date=today" would ignore the range.)
+            "begin_date": (
+                self._clock().astimezone(self._tz) - timedelta(days=1)
+            ).strftime("%Y%m%d"),
+            "range": "96",
             "application": "vhf-watch",
         }
         async with self._client() as client:
@@ -200,6 +208,37 @@ class Conditions:
             for f in al.json()["features"]
         ]
         return Forecast(updated=props.get("updated"), periods=periods, alerts=alerts)
+
+
+def tide_curve(
+    events: list[TideEvent], start: datetime, end: datetime, step: timedelta
+) -> list[tuple[datetime, float]]:
+    """Heights between `start` and `end`, every `step`, estimated from the
+    predicted highs and lows with a half-cosine between each pair.
+
+    Why not NOAA's own 6-minute curve: most stations in the zone, Bellingham
+    included, are NOAA "subordinate" stations, published as high/low times
+    only. The cosine between a high and the next low is the standard way to
+    estimate the tide in between (the method behind NOAA's tide-table
+    "height at any time" correction), so every station is drawn the same
+    way. It is an estimate: mid-tide heights can differ from a harmonic
+    model by a few tenths of a foot. Points outside the span of `events`
+    are left out rather than guessed.
+    """
+    points: list[tuple[datetime, float]] = []
+    t = start
+    i = 0
+    while t <= end:
+        while i + 1 < len(events) and events[i + 1].at <= t:
+            i += 1
+        if i + 1 < len(events) and events[i].at <= t:
+            a, b = events[i], events[i + 1]
+            frac = (t - a.at) / (b.at - a.at)
+            mid = (a.height_ft + b.height_ft) / 2
+            half = (a.height_ft - b.height_ft) / 2
+            points.append((t, mid + half * math.cos(math.pi * frac)))
+        t += step
+    return points
 
 
 def next_tide(events: list[TideEvent], now: datetime) -> TideEvent | None:

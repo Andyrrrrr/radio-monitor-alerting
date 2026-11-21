@@ -24,7 +24,7 @@ import ipaddress
 import json
 import sqlite3
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -45,7 +45,7 @@ from vhfwatch.config import Settings
 from vhfwatch.detect.hallucination import gate_transcript
 from vhfwatch.models import Transcript
 from vhfwatch.store import Database
-from vhfwatch.web.conditions import Conditions, next_tide
+from vhfwatch.web.conditions import Conditions, next_tide, tide_curve
 from vhfwatch.web.tokens import verify_token
 
 logger = structlog.get_logger(__name__)
@@ -283,10 +283,15 @@ def create_app(cfg: Settings, conditions: Conditions | None = None) -> FastAPI:
         tides, forecast = await asyncio.gather(
             conditions.tides(station), conditions.forecast()
         )
-        now = datetime.now(UTC)
+        now = conditions.now()
+        events = tides.value or []
+        # The window shown: today and tomorrow, local time. The fetch reaches a
+        # day either side so the curve has a high/low beyond each end.
+        start = now.astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=2)
         tide_days: dict[str, list[dict[str, Any]]] = {}
-        upcoming = next_tide(tides.value or [], now)
-        for event in tides.value or []:
+        upcoming = next_tide(events, now)
+        for event in (e for e in events if start <= e.at < end):
             tide_days.setdefault(f"{event.at:%A %b} {event.at.day}", []).append(
                 {
                     "time": event.at.strftime("%H:%M"),
@@ -295,10 +300,28 @@ def create_app(cfg: Settings, conditions: Conditions | None = None) -> FastAPI:
                     "is_next": event is upcoming,
                 }
             )
+        curve = tide_curve(events, start, end, timedelta(minutes=10))
+        chart = (
+            {
+                # Epoch milliseconds, so the browser draws and labels them in
+                # the station's timezone whatever the phone's own setting.
+                "points": [[int(t.timestamp() * 1000), round(h, 2)] for t, h in curve],
+                "events": [
+                    [int(e.at.timestamp() * 1000), e.height_ft, e.kind]
+                    for e in events
+                    if start <= e.at < end
+                ],
+                "now": int(now.timestamp() * 1000),
+                "tz": cfg.general.local_timezone,
+            }
+            if curve
+            else None
+        )
         return templates.TemplateResponse(
             request,
             "marine1.html",
             {
+                "chart": chart,
                 "feed": feed_items(request),
                 "tq": token_query(request),
                 "token": request.query_params.get("token", ""),

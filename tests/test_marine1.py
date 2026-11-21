@@ -2,6 +2,7 @@
 the page and its feed, and the trusted-networks access rule (D36)."""
 
 import asyncio
+import itertools
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from vhfwatch.config import DashboardConfig, Settings, WebConfig
 from vhfwatch.models import Detection, Severity, Transcript, Transmission, new_id
 from vhfwatch.store import Database
 from vhfwatch.web.app import create_app
-from vhfwatch.web.conditions import Conditions, next_tide
+from vhfwatch.web.conditions import Conditions, TideEvent, next_tide, tide_curve
 
 T0 = datetime(2026, 11, 14, 22, 0, 0, tzinfo=UTC)
 TZ = "America/Los_Angeles"
@@ -223,7 +224,7 @@ def client(
     cfg: Settings, host: str = "127.0.0.1", transport: httpx.MockTransport | None = None
 ) -> TestClient:
     conditions = Conditions(
-        cfg.web.dashboard, TZ, transport=transport or good_transport()
+        cfg.web.dashboard, TZ, transport=transport or good_transport(), clock=lambda: T0
     )
     return TestClient(create_app(cfg, conditions), client=(host, 51234))
 
@@ -288,3 +289,60 @@ def test_trusting_the_whole_internet_is_rejected_at_load() -> None:
 def test_a_malformed_network_is_rejected_at_load() -> None:
     with pytest.raises(pydantic.ValidationError):
         WebConfig(trusted_networks=["not-a-network"])
+
+
+# -- tide chart ---------------------------------------------------------------
+
+
+def _events() -> list[TideEvent]:
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo(TZ)
+    return [
+        TideEvent(datetime(2026, 11, 21, 13, 22, tzinfo=tz), "High", 8.70),
+        TideEvent(datetime(2026, 11, 21, 20, 50, tzinfo=tz), "Low", 0.04),
+        TideEvent(datetime(2026, 11, 22, 4, 6, tzinfo=tz), "High", 7.31),
+    ]
+
+
+def test_curve_passes_through_the_predicted_highs_and_lows() -> None:
+    ev = _events()
+    pts = dict(
+        tide_curve(ev, ev[0].at, ev[2].at - timedelta(minutes=1), timedelta(minutes=1))
+    )
+    assert pts[ev[0].at] == pytest.approx(8.70)
+    assert pts[ev[1].at] == pytest.approx(0.04)
+    halfway = ev[0].at + (ev[1].at - ev[0].at) / 2
+    assert pts[halfway] == pytest.approx((8.70 + 0.04) / 2)  # mid-tide is the average
+
+
+def test_curve_falls_steadily_from_high_to_low() -> None:
+    ev = _events()
+    heights = [h for _, h in tide_curve(ev, ev[0].at, ev[1].at, timedelta(minutes=10))]
+    assert all(a >= b for a, b in itertools.pairwise(heights))
+
+
+def test_curve_does_not_guess_outside_the_known_highs_and_lows() -> None:
+    ev = _events()
+    before = tide_curve(
+        ev,
+        ev[0].at - timedelta(hours=3),
+        ev[0].at - timedelta(minutes=1),
+        timedelta(minutes=10),
+    )
+    assert before == []
+
+
+def test_page_carries_the_chart_data_and_keeps_the_list(cfg: Settings) -> None:
+    with client(cfg) as c:
+        html = c.get("/marine1").text
+    assert "window.TIDE = " in html and 'id="tide-chart"' in html
+    assert "Highs and lows as a list" in html and "8.7 ft" in html
+    assert '"tz": "America/Los_Angeles"' in html
+
+
+def test_no_chart_when_tides_are_unavailable(cfg: Settings) -> None:
+    with client(cfg, transport=dead_transport()) as c:
+        html = c.get("/marine1").text
+    assert 'id="tide-chart"' not in html and "window.TIDE = " not in html
+    assert "Tides unavailable" in html
