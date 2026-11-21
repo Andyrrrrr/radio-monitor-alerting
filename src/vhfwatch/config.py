@@ -286,23 +286,28 @@ class DashboardConfig(_Section):
     ]
     # NWS marine zone: "Northern Inland Waters Including The San Juan Islands".
     forecast_zone: str = "PZZ133"
+    # Chosen by the operators 2026-11-21. The Port of Bellingham streams are
+    # live on YouTube; titles checked with YouTube's oEmbed the same day (the
+    # two Marine Park streams share a title, hence "camera 1/2").
     webcams: list[Webcam] = [
         Webcam(
             name="Bellingham Bay (Community Boating Center)",
             url="https://boatingcenter.org/webcams",
         ),
         Webcam(
-            name="Bellingham waterfront (Windfinder list)",
-            url="https://www.windfinder.com/webcams/bellingham",
-            note="third-party list of several cameras",
+            name="Bellingham Bay from Zuanich Point Park (Port of Bellingham)",
+            url="https://www.youtube.com/watch?v=6j0aasCRk_k",
+            note="live on YouTube",
         ),
         Webcam(
-            name="Anacortes ferry terminal (WSDOT)",
-            url="https://wsdot.com/ferries/vesselwatch/cameradetail.aspx?terminalid=1",
+            name="Bellingham Bay from Marine Park, camera 1 (Port of Bellingham)",
+            url="https://www.youtube.com/watch?v=heT-YAhjxiY",
+            note="live on YouTube",
         ),
         Webcam(
-            name="Friday Harbor ferry terminal (WSDOT)",
-            url="https://wsdot.com/ferries/vesselwatch/cameradetail.aspx?terminalid=10",
+            name="Bellingham Bay from Marine Park, camera 2 (Port of Bellingham)",
+            url="https://www.youtube.com/watch?v=DH0x6KOTreU",
+            note="live on YouTube",
         ),
     ]
     tides_cache_s: int = 6 * 3600  # predictions change once a day

@@ -65,7 +65,7 @@ Alternatives considered:
 ## 6. Decisions
 
 - **A. Access: decided 2026-11-21, station network plus Tailscale.** The page is reachable from the station network and over Tailscale, never from the open internet. Consequences to build and document: a way to mark those networks as trusted (a configured list of source ranges, so the existing per-incident token rule stays for everyone else), the web service bound to an address those networks can reach, and a one-page setup sheet for anyone joining the tailnet. **To check before relying on it:** Tailscale's current limit on free users against the number of people who will log in.
-- **B. Which webcams: open.** Start with the shortlist in section 3, and replace or add the team's favorites when sent (page links). Each is a link card; none is embedded until its owner's terms are checked.
+- **B. Which webcams: decided 2026-11-21.** The Community Boating Center page plus three Port of Bellingham YouTube streams (Zuanich Point Park and two at Marine Park), chosen by the operators. The Windfinder list and the two WSDOT ferry-terminal cameras from the first shortlist were removed. Still link cards, not embedded.
 - **C. Version 1 scope: decided 2026-11-21.** Radio feed, tides, weather and webcam link cards in the same release. Anything fancier later.
 
 ## 7. What's explicitly not in this plan

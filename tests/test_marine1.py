@@ -238,6 +238,8 @@ def test_page_shows_feed_tides_weather_and_cams(cfg: Settings) -> None:
     assert "8.7 ft" in html and "NOAA predictions" in html  # tides
     assert "Small Craft Advisory until 4 PM" in html  # NWS warning first
     assert "boatingcenter.org/webcams" in html  # webcam links
+    assert "youtube.com/watch?v=6j0aasCRk_k" in html  # the operators' picks
+    assert "wsdot.com" not in html and "windfinder" not in html  # removed 2026-11-21
     assert 'target="_blank"' in html
 
 
