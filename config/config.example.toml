@@ -229,6 +229,31 @@ host        = "127.0.0.1"
 port        = 8080
 base_url    = "http://127.0.0.1:8080"   # used to build alert deep links
 token_ttl_days = 365
+# Source networks that need no share token (D36). To open the Marine 1 page to the
+# station network and Tailscale, set host = "0.0.0.0" above and list both here,
+# e.g. ["100.64.0.0/10", "<station LAN, from `ip -br addr` on the host>"].
+# Never "0.0.0.0/0": the app refuses to start, because these are recordings of
+# real people and the page must not reach the open internet.
+trusted_networks = []
+
+# The Marine 1 page (/marine1). Every key has a default; uncomment to change.
+[web.dashboard]
+# feed_limit            = 40          # transmissions shown
+# forecast_zone         = "PZZ133"    # NWS: Northern Inland Waters incl. San Juan Islands
+# tides_cache_s         = 21600       # NOAA predictions change once a day
+# weather_cache_s       = 900
+# retry_after_failure_s = 120         # offline: don't make each page load wait
+# fetch_timeout_s       = 6.0
+# user_agent            = "vhf-watch (hobbyist marine VHF monitor)"  # never an email
+#
+# Tide stations (first = default) and webcams replace the built-in lists when set:
+# tide_stations = [
+#   { id = "9449211", name = "Bellingham" },
+#   { id = "9449880", name = "Friday Harbor" },
+# ]
+# webcams = [
+#   { name = "Bellingham Bay (Community Boating Center)", url = "https://boatingcenter.org/webcams" },
+# ]
 
 [storage]
 archive_codec      = "opus"    # archival

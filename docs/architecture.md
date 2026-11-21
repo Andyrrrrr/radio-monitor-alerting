@@ -488,6 +488,12 @@ Routes:
 - `POST /incidents/{id}/annotations`
 - `GET /health` — pipeline status, last transmission time, noise floor
 - `GET /live` — SSE stream of new transmissions
+- `GET /marine1` — the Marine 1 page: channel 16 feed (newest first, recording + transcript, severity badge, rejected-as-noise marked), NOAA tide predictions for a picked station, the NWS marine forecast and warnings for zone PZZ133, and webcam links (`[web.dashboard]`)
+- `GET /marine1/feed` — the feed alone; the page re-fetches it when `/live` reports a new transmission
+
+**Access (D36):** loopback and `[web] trusted_networks` (the station LAN and Tailscale's 100.64.0.0/10) need no token; anyone else needs a share token. The app is never exposed to the open internet.
+
+**Tides and weather are fetched by the web process** (`web/conditions.py`) and cached: tides for hours, forecasts for 15 minutes. A failed fetch serves the last good copy marked stale with its age, and waits `retry_after_failure_s` before trying again, so the page renders at full speed with the network down; the radio feed never needs the internet.
 
 **Incident page priority order:** one-line status (severity, time, vessel, nature, position) → latest transmission playable in one tap → full chronological transcript with synced audio → summary, on the same screen as the transcript, never behind a tab → acknowledge and feedback controls.
 

@@ -34,12 +34,14 @@
   header h1 { font-size: 1.2rem; }
   .disclaimer { font-size: 0.78rem; opacity: 0.6; margin-top: 2rem; }
 </style>
+{% block head %}{% endblock %}
 </head>
 <body>
 <header>
   <h1><a href="/" style="text-decoration:none">vhf-watch</a></h1>
-  <span class="muted">supplemental awareness — not a safety system</span>
+  <nav class="muted"><a href="/marine1">Marine 1</a> · <a href="/">Incidents</a></nav>
 </header>
+<p class="muted" style="margin-top:0">supplemental awareness — not a safety system</p>
 {% block content %}{% endblock %}
 <p class="disclaimer">This is a hobbyist monitoring tool. It misses
 transmissions, mishears words, and goes down without warning. Never rely on

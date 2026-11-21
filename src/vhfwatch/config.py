@@ -16,6 +16,7 @@ Secrets are env-only and are NOT modeled here until the features that need
 them land — never add a secret to the TOML schema.
 """
 
+import ipaddress
 import tomllib
 from pathlib import Path
 from typing import Literal, Self
@@ -254,11 +255,85 @@ class AlertingConfig(_Section):
     telegram: TelegramConfig = TelegramConfig()
 
 
+class TideStation(_Section):
+    id: str  # NOAA CO-OPS station id, e.g. "9449211"
+    name: str
+
+
+class Webcam(_Section):
+    name: str
+    url: str  # the camera's own page; opened in a new tab, never embedded
+    note: str = ""
+
+
+class DashboardConfig(_Section):
+    """The Marine 1 page (docs/plans/2026-11-21-marine1-web-dashboard.md):
+    the channel 16 feed beside NOAA tides, the NWS marine forecast and
+    webcam links. Tides and weather are fetched by the web process and
+    cached, so the page still renders, with their age shown, offline."""
+
+    feed_limit: int = 40  # transmissions shown, newest first
+    # First entry is the default. All inside the response zone; ids from
+    # NOAA's station list (api.tidesandcurrents.noaa.gov), checked 2026-11-21.
+    tide_stations: list[TideStation] = [
+        TideStation(id="9449211", name="Bellingham"),
+        TideStation(id="9449424", name="Cherry Point"),
+        TideStation(id="9449679", name="Blaine, Semiahmoo Bay"),
+        TideStation(id="9449639", name="Point Roberts"),
+        TideStation(id="9448794", name="Anacortes, Guemes Channel"),
+        TideStation(id="9449880", name="Friday Harbor"),
+        TideStation(id="9449834", name="Roche Harbor"),
+    ]
+    # NWS marine zone: "Northern Inland Waters Including The San Juan Islands".
+    forecast_zone: str = "PZZ133"
+    webcams: list[Webcam] = [
+        Webcam(
+            name="Bellingham Bay (Community Boating Center)",
+            url="https://boatingcenter.org/webcams",
+        ),
+        Webcam(
+            name="Bellingham waterfront (Windfinder list)",
+            url="https://www.windfinder.com/webcams/bellingham",
+            note="third-party list of several cameras",
+        ),
+        Webcam(
+            name="Anacortes ferry terminal (WSDOT)",
+            url="https://wsdot.com/ferries/vesselwatch/cameradetail.aspx?terminalid=1",
+        ),
+        Webcam(
+            name="Friday Harbor ferry terminal (WSDOT)",
+            url="https://wsdot.com/ferries/vesselwatch/cameradetail.aspx?terminalid=10",
+        ),
+    ]
+    tides_cache_s: int = 6 * 3600  # predictions change once a day
+    weather_cache_s: int = 900  # NWS updates forecasts a few times a day
+    retry_after_failure_s: int = 120  # offline: don't make every page load wait
+    fetch_timeout_s: float = 6.0
+    # NWS asks API clients to identify themselves. Generic on purpose: never
+    # put a person's email here (the repo is public).
+    user_agent: str = "vhf-watch (hobbyist marine VHF monitor)"
+
+
 class WebConfig(_Section):
     host: str = "127.0.0.1"
     port: int = 8080
     base_url: str = "http://127.0.0.1:8080"  # used to build alert deep links
     token_ttl_days: int = 365
+    # Source networks treated like loopback: no share token needed. Meant for
+    # the station LAN and the Tailscale range (100.64.0.0/10), never "0.0.0.0/0"
+    # (docs/decisions.md D36). Empty = only loopback is trusted, as before.
+    trusted_networks: list[str] = []
+    dashboard: DashboardConfig = DashboardConfig()
+
+    @model_validator(mode="after")
+    def _trusted_networks_parse(self) -> Self:
+        for net in self.trusted_networks:
+            parsed = ipaddress.ip_network(net, strict=False)  # raises if malformed
+            if parsed.prefixlen == 0:
+                raise ValueError(
+                    f"trusted_networks entry {net!r} trusts the whole internet"
+                )
+        return self
 
 
 class StorageConfig(_Section):

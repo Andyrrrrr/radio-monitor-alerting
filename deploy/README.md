@@ -318,6 +318,27 @@ Install **Tailscale** (see tailscale.com/download/linux) on the host and on your
 laptop; then `ssh` works from anywhere by name, with no port forwarding and
 nothing exposed. Read an install script before piping it to a shell.
 
+## The Marine 1 page (optional, D36)
+
+The page is `http://<host>:8080/marine1`, served by `vhfwatch-web.service`, a separate
+unit from the pipeline so it can never stall detection (D8). To open it to the station
+network and Tailscale, in the host's `config/config.toml`:
+
+```toml
+[web]
+host             = "0.0.0.0"
+trusted_networks = ["100.64.0.0/10", "<station LAN range>"]   # never "0.0.0.0/0"
+base_url         = "http://<host's Tailscale address>:8080"   # fixes alert links too
+```
+
+Then install and start the web unit (same steps as the pipeline unit, with
+`vhfwatch-web.service`), and from a phone on Tailscale or the station wifi open
+`/marine1`. Check: the feed plays a recording, the tide matches NOAA's own page for the
+same station and day, and the forecast matches weather.gov. Anyone off-station needs
+the Tailscale app and an invitation to the tailnet; check Tailscale's current free-user
+limit against the number of people. `base_url` is what alert links are built from: until
+it is a reachable address, the link in each Telegram alert opens nothing on a phone.
+
 ## Not built, so do not assume
 
 - **`WatchdogSec=` / `sd_notify`.** systemd can also kill a *hung-but-alive*

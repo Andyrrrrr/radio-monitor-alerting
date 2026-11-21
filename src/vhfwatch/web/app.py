@@ -5,9 +5,13 @@ stop detection (docs/decisions.md D8). It reads the store and writes only
 acknowledgments, feedback, and annotations.
 
 Access model (POC): requests from loopback are trusted (the default bind is
-127.0.0.1, so remote exposure is a deliberate config change); remote
-requests need a per-recipient share token minted into the alert link. All
-access to incident records is logged.
+127.0.0.1, so remote exposure is a deliberate config change), and so are
+requests from `[web] trusted_networks` (the station LAN and Tailscale,
+docs/decisions.md D36); anyone else needs a per-recipient share token
+minted into the alert link. All access to incident records is logged.
+
+The Marine 1 page (/marine1) puts the channel 16 feed beside NOAA tides,
+the NWS marine forecast and webcam links (web/conditions.py).
 
 Everything rendered is evidence-first: original audio and raw transcript
 are always present, the LLM summary sits beside them (never instead), and
@@ -16,11 +20,14 @@ transmission signal glyph, which tier fired in plain language.
 """
 
 import asyncio
+import ipaddress
 import json
 import sqlite3
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import structlog
 from fastapi import FastAPI, Form, HTTPException, Request
@@ -35,7 +42,10 @@ from fastapi.templating import Jinja2Templates
 
 from vhfwatch.audio.encode import playback_path_for
 from vhfwatch.config import Settings
+from vhfwatch.detect.hallucination import gate_transcript
+from vhfwatch.models import Transcript
 from vhfwatch.store import Database
+from vhfwatch.web.conditions import Conditions, next_tide
 from vhfwatch.web.tokens import verify_token
 
 logger = structlog.get_logger(__name__)
@@ -68,18 +78,45 @@ def _tier_words(tier: str) -> str:
     }.get(tier, tier)
 
 
-def create_app(cfg: Settings) -> FastAPI:
+def _age(then: datetime | None, now: datetime) -> str:
+    """'just now', '7 min ago', '3 h ago': how old a fetched tile is."""
+    if then is None:
+        return "never"
+    minutes = int((now - then).total_seconds() // 60)
+    if minutes < 1:
+        return "just now"
+    if minutes < 120:
+        return f"{minutes} min ago"
+    return f"{minutes // 60} h ago"
+
+
+def create_app(cfg: Settings, conditions: Conditions | None = None) -> FastAPI:
     app = FastAPI(title="vhf-watch", docs_url=None, redoc_url=None)
     templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
     db = Database(cfg.general.data_dir / "vhfwatch.db", allow_threads=True)
     db.migrate()
+    trusted = [ipaddress.ip_network(n, strict=False) for n in cfg.web.trusted_networks]
+    tz = ZoneInfo(cfg.general.local_timezone)
+    dash = cfg.web.dashboard
+    conditions = conditions or Conditions(dash, cfg.general.local_timezone)
+
+    def is_trusted(host: str) -> bool:
+        """Loopback, or a source address inside `[web] trusted_networks`."""
+        if host in ("127.0.0.1", "::1", "localhost"):
+            return True
+        try:
+            addr = ipaddress.ip_address(host)
+        except ValueError:
+            return False
+        return any(addr in net for net in trusted)
 
     def authorize(request: Request, incident_id: str | None) -> None:
-        """Loopback is trusted; anything else needs a valid share token
-        (scoped to the incident when one is in play). Always logged."""
+        """Loopback and trusted networks are trusted; anything else needs a
+        valid share token (scoped to the incident when one is in play).
+        Always logged."""
         host = request.client.host if request.client else ""
         raw = request.query_params.get("token")
-        if host in ("127.0.0.1", "::1", "localhost"):
+        if is_trusted(host):
             db.log_access(None, str(request.url.path), host)
             return
         if raw:
@@ -191,6 +228,101 @@ def create_app(cfg: Settings) -> FastAPI:
 
         return StreamingResponse(stream(), media_type="text/event-stream")
 
+    # -- Marine 1 page -----------------------------------------------------
+
+    def token_query(request: Request) -> str:
+        """Carry a share token through the page's own links and audio."""
+        token = request.query_params.get("token", "")
+        return f"?token={token}" if token else ""
+
+    def feed_items(request: Request) -> list[dict[str, Any]]:
+        tq = token_query(request)
+        items: list[dict[str, Any]] = []
+        for row in db.recent_feed(dash.feed_limit):
+            started = datetime.fromisoformat(row["started_at"]).astimezone(tz)
+            text = row["text"]
+            # The same hallucination gate the pipeline runs before detection:
+            # a rejected transcript is shown, but marked as likely noise.
+            rejected = None
+            if text is not None:
+                rejected = gate_transcript(
+                    Transcript(
+                        transmission_id=row["id"],
+                        engine="",
+                        text=text,
+                        avg_logprob=row["avg_logprob"],
+                        no_speech_prob=row["no_speech_prob"],
+                    ),
+                    cfg.hallucination,
+                    cfg.asr,
+                )
+            items.append(
+                {
+                    "when": started.strftime("%a %H:%M:%S"),
+                    "duration_s": round(row["duration_ms"] / 1000, 1),
+                    "snr_glyph": _snr_glyph(row["est_snr_db"]),
+                    "severity": row["severity"],
+                    "text": text,
+                    "rejected": rejected,
+                    "audio_url": (
+                        f"/transmissions/{row['id']}/audio{tq}"
+                        if row["audio_path"]
+                        else None
+                    ),
+                }
+            )
+        return items
+
+    @app.get("/marine1", response_class=HTMLResponse)
+    async def marine1(request: Request) -> HTMLResponse:
+        authorize(request, None)
+        stations = {s.id: s.name for s in dash.tide_stations}
+        station = request.query_params.get("station") or dash.tide_stations[0].id
+        if station not in stations:
+            raise HTTPException(status_code=400, detail="unknown tide station")
+        tides, forecast = await asyncio.gather(
+            conditions.tides(station), conditions.forecast()
+        )
+        now = datetime.now(UTC)
+        tide_days: dict[str, list[dict[str, Any]]] = {}
+        upcoming = next_tide(tides.value or [], now)
+        for event in tides.value or []:
+            tide_days.setdefault(f"{event.at:%A %b} {event.at.day}", []).append(
+                {
+                    "time": event.at.strftime("%H:%M"),
+                    "kind": event.kind,
+                    "height_ft": f"{event.height_ft:.1f}",
+                    "is_next": event is upcoming,
+                }
+            )
+        return templates.TemplateResponse(
+            request,
+            "marine1.html",
+            {
+                "feed": feed_items(request),
+                "tq": token_query(request),
+                "token": request.query_params.get("token", ""),
+                "stations": stations,
+                "station": station,
+                "tides": tides,
+                "tide_days": tide_days,
+                "next_tide": upcoming,
+                "tides_age": _age(tides.fetched_at, now),
+                "forecast": forecast,
+                "forecast_age": _age(forecast.fetched_at, now),
+                "zone": dash.forecast_zone,
+                "webcams": dash.webcams,
+            },
+        )
+
+    @app.get("/marine1/feed", response_class=HTMLResponse)
+    def marine1_feed(request: Request) -> HTMLResponse:
+        """The feed alone, for the page's live refresh."""
+        authorize(request, None)
+        return templates.TemplateResponse(
+            request, "_feed.html", {"feed": feed_items(request)}
+        )
+
     # -- write routes (the only ones) --------------------------------------
 
     @app.post("/incidents/{incident_id}/ack")
@@ -236,7 +368,7 @@ def create_app(cfg: Settings) -> FastAPI:
 
     def _authorize_form(request: Request, incident_id: str, token: str) -> None:
         host = request.client.host if request.client else ""
-        if host in ("127.0.0.1", "::1", "localhost"):
+        if is_trusted(host):
             return
         if token and verify_token(db, token) == incident_id:
             return
