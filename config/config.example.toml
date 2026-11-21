@@ -144,7 +144,11 @@ out_of_area_phrases   = ["victoria coast guard", "victoria traffic"]
 # own config.toml.
 strict_urgent           = true
 urgent_call_terms       = ["mayday", "may day", "mayday relay", "pan pan"]
-urgent_speaker_phrases  = ["coast guard"]
+# Who may qualify: [] means anyone, so a vessel's own pan-pan/mayday counts too (it was
+# a vessel's pan-pan, six minutes before the Coast Guard broadcast, that Saturday's fire
+# call lost, D35 addendum 2026-11-21). Put ["coast guard"] here to require the Coast
+# Guard to speak, as before. The Victoria phrases above still always block.
+urgent_speaker_phrases  = []
 strict_window_s         = 300   # how long a held pan-pan waits for its place
 llm_min_words         = 8      # classify longer transcripts even with no match
 llm_min_confidence    = 0.6    # below this the LLM verdict only rates WATCH

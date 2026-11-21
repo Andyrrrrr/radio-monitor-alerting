@@ -116,6 +116,8 @@ class Detector:
         return None
 
     def _coast_guard_speaks(self, text: str) -> bool:
+        if not self._speakers:
+            return True  # urgent_speaker_phrases = []: anyone may qualify
         padded = f" {normalize(text)} "
         return any(f" {p} " in padded for p in self._speakers)
 

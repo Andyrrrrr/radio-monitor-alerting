@@ -1291,3 +1291,40 @@ restart, which at worst delays one ring.
 **Revisit when** the team is ready to turn the gate off; or to use spoken coordinates
 inside the zone (`detect/position.py`, D30) as place evidence, which would catch the two
 garbled-name bodies above; or to stop repeats of the same report ringing again.
+
+### D35 addendum 2026-11-21: nobody has to be the Coast Guard (`urgent_speaker_phrases = []`)
+
+**What happened.** On Saturday 2026-11-14 a 41-foot sailboat on fire in Bellingham Bay rang
+the gate at 16:20:26 local, via the 5-minute window: a Coast Guard pan-pan opener, held, then
+the Coast Guard's own broadcast naming Bellingham Bay 55 seconds later. The crew got there.
+But the vessel itself had called "Pan-pan x3, sailing vessel Annabella" at 16:13:49, told the
+Coast Guard on channel 16 it had a possible fire and might need assistance, and named
+"the south entrance to Squalicum Harbor" at 16:14:45 (an in-zone name) and gave a GPS
+position at 16:15:51. The gate held all of that, because a vessel's pan-pan was not a Coast
+Guard call, and again the Squalicum Harbor transmission, because it had no Coast Guard
+phrase. The first ring was 6 min 37 s after the vessel's pan-pan.
+
+**The change.** An empty `urgent_speaker_phrases` list now means anyone may qualify: a
+vessel's own exact mayday/pan-pan is held as an anchor like a Coast Guard one, and a later
+transmission naming an in-zone place releases it, whoever spoke. A mayday/pan-pan that names
+an in-zone place in the same transmission rings at once. The place is still required, the
+Victoria phrases still always block, and the 5-minute window is unchanged. The code default
+stays `["coast guard"]`; the example config and the host set `[]`.
+
+**Measured (replay, Tier 1 only, hallucination gate applied, 960 transcripts, Sep 7 to
+Nov 21).** Old rules 66 rings, Coast Guard required 12, no speaker requirement **13**. The one
+extra ring is Saturday's: at 16:14:45, 5.7 minutes before the alert that actually rang. It
+loses none of the 12, and adds no false alarm in 11 weeks. Why so little changes: of 76
+detections that contain a mayday/pan-pan term, 61 were Coast Guard, 3 Victoria, and only 12
+anything else; 11 of those 12 are junk or chatter (the Coast Guard's recorded notice, "Pan-pan,
+securite.", "Mayday, channel 16.", someone saying "mayday, switch to 83 alpha") and none had
+an in-zone place within 5 minutes.
+
+**Cost, stated plainly.** A casual or mistaken mayday/pan-pan plus any unrelated boat naming
+an in-zone place within 5 minutes now rings. Nothing like that occurred in the data, but
+11 weeks is a small sample. The vessel's own call is still never trusted on its own: no place
+named, no ring.
+
+**Revisit when** the log shows a ring caused by chatter, or when spoken coordinates inside the
+zone (detect/position.py, D30) can release an anchor too: the vessel's GPS position at
+16:15:51 was a second, independent release that this rule still cannot use.
