@@ -15,7 +15,7 @@ from starlette.testclient import TestClient
 from vhfwatch.config import DashboardConfig, Settings, WebConfig
 from vhfwatch.models import Detection, Severity, Transcript, Transmission, new_id
 from vhfwatch.store import Database
-from vhfwatch.web.app import create_app
+from vhfwatch.web.app import _today_and_tonight, create_app
 from vhfwatch.web.conditions import Conditions, TideEvent, next_tide, tide_curve
 
 T0 = datetime(2026, 11, 14, 22, 0, 0, tzinfo=UTC)
@@ -236,7 +236,7 @@ def test_page_shows_feed_tides_weather_and_cams(cfg: Settings) -> None:
     html = page.text
     assert "Squalicum Harbor" in html and "URGENT" in html  # the feed
     assert "Likely noise" in html  # the rejected transcript is shown, marked
-    assert "8.7 ft" in html and "NOAA predictions" in html  # tides
+    assert '8.7, "High"' in html and "NOAA predictions" in html  # tides (chart data)
     assert "Small Craft Advisory until 4 PM" in html  # NWS warning first
     assert "boatingcenter.org/webcams" in html  # webcam links
     assert "youtube.com/watch?v=6j0aasCRk_k" in html  # the operators' picks
@@ -333,12 +333,16 @@ def test_curve_does_not_guess_outside_the_known_highs_and_lows() -> None:
     assert before == []
 
 
-def test_page_carries_the_chart_data_and_keeps_the_list(cfg: Settings) -> None:
+def test_page_carries_the_chart_data_without_the_list_or_drag_hint(
+    cfg: Settings,
+) -> None:
     with client(cfg) as c:
         html = c.get("/marine1").text
     assert "window.TIDE = " in html and 'id="tide-chart"' in html
-    assert "Highs and lows as a list" in html and "8.7 ft" in html
     assert '"tz": "America/Los_Angeles"' in html
+    assert "Highs and lows as a list" not in html  # removed 2026-11-21
+    assert "Drag along the chart" not in html
+    assert "estimated" in html  # but the reader is still told the curve is an estimate
 
 
 def test_no_chart_when_tides_are_unavailable(cfg: Settings) -> None:
@@ -417,3 +421,29 @@ def test_long_transcripts_are_marked_for_folding(cfg: Settings) -> None:
     with client(cfg) as c:
         html = c.get("/marine1/feed").text
     assert 'class="msg-text clamp"' in html and 'class="msg-more"' in html
+
+
+def test_forecast_shows_today_and_tonight_in_the_daytime() -> None:
+    periods = [("Today", "a"), ("Tonight", "b"), ("Sun", "c"), ("Sun Night", "d")]
+    assert _today_and_tonight(periods) == [("Today", "a"), ("Tonight", "b")]
+    assert (
+        _today_and_tonight([("This Afternoon", "a"), ("Tonight", "b"), ("Sun", "c")])[
+            -1
+        ][0]
+        == "Tonight"
+    )
+
+
+def test_forecast_shows_only_tonight_in_the_evening() -> None:
+    # After dark NWS starts at "Tonight"; the next period is already tomorrow.
+    assert _today_and_tonight([("Tonight", "b"), ("Sun", "c")]) == [("Tonight", "b")]
+    assert _today_and_tonight([("Overnight", "b"), ("Sun", "c")]) == [
+        ("Overnight", "b")
+    ]
+    assert _today_and_tonight([]) == []
+
+
+def test_page_shows_no_later_forecast_periods(cfg: Settings) -> None:
+    with client(cfg) as c:
+        html = c.get("/marine1").text
+    assert "<strong>Today:</strong>" in html and "<strong>Tonight:</strong>" in html

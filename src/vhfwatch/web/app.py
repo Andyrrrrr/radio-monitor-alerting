@@ -46,7 +46,7 @@ from vhfwatch.detect.hallucination import gate_transcript
 from vhfwatch.detect.position import OUTSIDE_AREA_NOTE, find_positions, position_parts
 from vhfwatch.models import Transcript
 from vhfwatch.store import Database
-from vhfwatch.web.conditions import Conditions, next_tide, tide_curve
+from vhfwatch.web.conditions import Conditions, tide_curve
 from vhfwatch.web.tokens import verify_token
 
 logger = structlog.get_logger(__name__)
@@ -89,6 +89,17 @@ def _age(then: datetime | None, now: datetime) -> str:
     if minutes < 120:
         return f"{minutes} min ago"
     return f"{minutes // 60} h ago"
+
+
+def _today_and_tonight(periods: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """The NWS forecast periods for today and tonight only. NWS starts with the
+    current period: in the day that is "Today"/"This Afternoon" and the next is
+    "Tonight"; in the evening it starts at "Tonight"/"Overnight", and the next
+    period is already tomorrow, so it is left off."""
+    if not periods:
+        return []
+    first = periods[0][0].lower()
+    return periods[:1] if "night" in first else periods[:2]
 
 
 def create_app(cfg: Settings, conditions: Conditions | None = None) -> FastAPI:
@@ -311,17 +322,6 @@ def create_app(cfg: Settings, conditions: Conditions | None = None) -> FastAPI:
         # day either side so the curve has a high/low beyond each end.
         start = now.astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
         end = start + timedelta(days=2)
-        tide_days: dict[str, list[dict[str, Any]]] = {}
-        upcoming = next_tide(events, now)
-        for event in (e for e in events if start <= e.at < end):
-            tide_days.setdefault(f"{event.at:%A %b} {event.at.day}", []).append(
-                {
-                    "time": event.at.strftime("%H:%M"),
-                    "kind": event.kind,
-                    "height_ft": f"{event.height_ft:.1f}",
-                    "is_next": event is upcoming,
-                }
-            )
         curve = tide_curve(events, start, end, timedelta(minutes=10))
         chart = (
             {
@@ -350,7 +350,9 @@ def create_app(cfg: Settings, conditions: Conditions | None = None) -> FastAPI:
                 "stations": stations,
                 "station": station,
                 "tides": tides,
-                "tide_days": tide_days,
+                "forecast_now": _today_and_tonight(
+                    forecast.value.periods if forecast.value else []
+                ),
                 "tides_age": _age(tides.fetched_at, now),
                 "forecast": forecast,
                 "forecast_age": _age(forecast.fetched_at, now),
