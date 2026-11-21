@@ -130,7 +130,7 @@ class Database:
         page's channel 16 feed. One query, so the page never does N+1 reads."""
         cur = self._conn.execute(
             """
-            SELECT x.id, x.started_at, x.duration_ms, x.est_snr_db, x.audio_path,
+            SELECT x.id, x.channel, x.started_at, x.duration_ms, x.est_snr_db, x.audio_path,
                    t.text, t.avg_logprob, t.no_speech_prob,
                    (SELECT d.severity FROM detection d
                      WHERE d.transmission_id = x.id

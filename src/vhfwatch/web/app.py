@@ -43,6 +43,7 @@ from fastapi.templating import Jinja2Templates
 from vhfwatch.audio.encode import playback_path_for
 from vhfwatch.config import Settings
 from vhfwatch.detect.hallucination import gate_transcript
+from vhfwatch.detect.position import OUTSIDE_AREA_NOTE, find_positions, position_parts
 from vhfwatch.models import Transcript
 from vhfwatch.store import Database
 from vhfwatch.web.conditions import Conditions, next_tide, tide_curve
@@ -256,11 +257,32 @@ def create_app(cfg: Settings, conditions: Conditions | None = None) -> FastAPI:
                     cfg.hallucination,
                     cfg.asr,
                 )
+            # Spoken coordinates as map lines, exactly as the Telegram caption
+            # shows them, and likewise never read from a rejected transcript.
+            positions = []
+            if cfg.position.enabled and text and not rejected:
+                for pos in find_positions(text):
+                    label, outside, url = position_parts(
+                        pos, cfg.position.expected_area
+                    )
+                    note = OUTSIDE_AREA_NOTE if outside else None
+                    positions.append({"label": label, "note": note, "url": url})
             items.append(
                 {
-                    "when": started.strftime("%a %H:%M:%S"),
-                    "duration_s": round(row["duration_ms"] / 1000, 1),
-                    "snr_glyph": _snr_glyph(row["est_snr_db"]),
+                    "id": row["id"],
+                    "positions": positions,
+                    # The Telegram caption's own line, so the two read alike.
+                    "meta": (
+                        f"ch {row['channel']} · {started:%H:%M:%S} · "
+                        f"{row['duration_ms'] / 1000:.1f}s · SNR\u00a0"
+                        + (
+                            f"{row['est_snr_db']:.0f}\u00a0dB"
+                            if row["est_snr_db"] is not None
+                            else "?"
+                        )
+                    ),
+                    "day": f"{started:%A, %B} {started.day}",
+                    "clock": f"{started:%I:%M %p}".lstrip("0"),
                     "severity": row["severity"],
                     "text": text,
                     "rejected": rejected,
@@ -329,7 +351,6 @@ def create_app(cfg: Settings, conditions: Conditions | None = None) -> FastAPI:
                 "station": station,
                 "tides": tides,
                 "tide_days": tide_days,
-                "next_tide": upcoming,
                 "tides_age": _age(tides.fetched_at, now),
                 "forecast": forecast,
                 "forecast_age": _age(forecast.fetched_at, now),

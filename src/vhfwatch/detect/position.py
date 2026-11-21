@@ -238,8 +238,11 @@ def _in_area(position: Position, area: list[float]) -> bool:
     return lat_min <= position.lat <= lat_max and lon_min <= position.lon <= lon_max
 
 
-def format_position(position: Position, expected_area: list[float]) -> str:
-    """The lines that go in a notification beside the transcript.
+def position_parts(
+    position: Position, expected_area: list[float]
+) -> tuple[str, bool, str]:
+    """(label, outside the expected area, map URL): the pieces of a position
+    line, shared by the Telegram caption and the web page so they read alike.
 
     Worded as "read from the transcript" on purpose: this is parsed from machine
     output that is wrong about numbers more often than anything else, and the
@@ -247,13 +250,22 @@ def format_position(position: Position, expected_area: list[float]) -> str:
     """
     ns = "N" if position.lat >= 0 else "S"
     ew = "E" if position.lon >= 0 else "W"
-    lines = [
-        (
-            f"📍 {abs(position.lat):.4f}°{ns} {abs(position.lon):.4f}°{ew} "
-            "(read from the transcript, check it against the recording)"
-        ),
-    ]
-    if len(expected_area) == 4 and not _in_area(position, expected_area):
-        lines.append("⚠️ outside the usual area, so probably misheard")
-    lines.append(maps_url(position.lat, position.lon))
+    label = (
+        f"📍 {abs(position.lat):.4f}°{ns} {abs(position.lon):.4f}°{ew} "
+        "(read from the transcript, check it against the recording)"
+    )
+    outside = len(expected_area) == 4 and not _in_area(position, expected_area)
+    return label, outside, maps_url(position.lat, position.lon)
+
+
+OUTSIDE_AREA_NOTE = "⚠️ outside the usual area, so probably misheard"
+
+
+def format_position(position: Position, expected_area: list[float]) -> str:
+    """The lines that go in a notification beside the transcript."""
+    label, outside, url = position_parts(position, expected_area)
+    lines = [label]
+    if outside:
+        lines.append(OUTSIDE_AREA_NOTE)
+    lines.append(url)
     return "\n".join(lines)

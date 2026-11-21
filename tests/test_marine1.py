@@ -346,3 +346,74 @@ def test_no_chart_when_tides_are_unavailable(cfg: Settings) -> None:
         html = c.get("/marine1").text
     assert 'id="tide-chart"' not in html and "window.TIDE = " not in html
     assert "Tides unavailable" in html
+
+
+def test_tides_then_weather_then_radio_then_webcams(cfg: Settings) -> None:
+    with client(cfg) as c:
+        html = c.get("/marine1").text
+    order = [html.index(f'id="{a}"') for a in ("tides", "weather", "ch16", "cams")]
+    assert order == sorted(order)
+    assert (
+        "Next tide," not in html
+    )  # the old summary card is gone; the chart replaces it
+
+
+def test_transmissions_read_like_the_telegram_messages(cfg: Settings) -> None:
+    with client(cfg) as c:
+        html = c.get("/marine1/feed").text
+    # Same metadata line as the Telegram caption (14:00 PST for 22:00 UTC).
+    # Non-breaking spaces keep "SNR 40 dB" on one line on a phone.
+    assert "ch 16 · 14:00:00 · 4.0s · SNR\u00a040\u00a0dB" in html
+    assert 'class="day-chip"' in html and "Saturday, November 14" in html
+    assert html.count('class="day-chip"') == 1  # one chip per day, not per message
+    assert 'class="msg noise"' in html  # the rejected one is still marked
+
+
+def _add_tx(cfg: Settings, text: str, minutes: int) -> None:
+    with Database(cfg.general.data_dir / "vhfwatch.db") as db:
+        tx_id = new_id()
+        db.insert_transmission(
+            Transmission(
+                id=tx_id,
+                channel="16",
+                started_at=T0 + timedelta(minutes=minutes),
+                ended_at=T0 + timedelta(minutes=minutes, seconds=4),
+                duration_ms=4000,
+                pcm=np.zeros(1, dtype=np.float32),
+                sample_rate=16000,
+                rms_dbfs=-20.0,
+                peak_dbfs=-6.0,
+                est_snr_db=40.0,
+                audio_path=None,
+                audio_sha256=None,
+                source="test",
+            )
+        )
+        db.insert_transcript(Transcript(transmission_id=tx_id, engine="t", text=text))
+
+
+def test_a_spoken_position_gets_a_map_line_like_telegram(cfg: Settings) -> None:
+    _add_tx(
+        cfg, "aground at 48 degrees 44 minutes north 122 degrees 30 minutes west", 5
+    )
+    with client(cfg) as c:
+        html = c.get("/marine1/feed").text
+    assert "48.7333°N 122.5000°W (read from the transcript" in html
+    assert "Open in Google Maps" in html
+    assert "google.com/maps/search/?api=1&amp;query=48.733333,-122.500000" in html
+
+
+def test_position_outside_the_expected_area_is_flagged_not_dropped(
+    cfg: Settings,
+) -> None:
+    cfg.position.expected_area = [48.4, 49.0, -123.3, -122.4]
+    _add_tx(cfg, "position 47 degrees 30 minutes north 122 degrees 20 minutes west", 5)
+    with client(cfg) as c:
+        html = c.get("/marine1/feed").text
+    assert "47.5000°N" in html and "probably misheard" in html
+
+
+def test_long_transcripts_are_marked_for_folding(cfg: Settings) -> None:
+    with client(cfg) as c:
+        html = c.get("/marine1/feed").text
+    assert 'class="msg-text clamp"' in html and 'class="msg-more"' in html

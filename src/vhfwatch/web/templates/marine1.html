@@ -3,14 +3,32 @@
 {% block head %}
 <style>
   h2 { font-size: 1.05rem; margin: 1.4rem 0 0.4rem; }
-  .now { display: grid; gap: 0.5rem; grid-template-columns: 1fr; }
-  @media (min-width: 40rem) { .now { grid-template-columns: 1fr 1fr; } }
   .alert { border-left: 4px solid #c0392b; padding: 0.4rem 0.7rem;
            background: rgba(192,57,43,.08); margin: 0.4rem 0; }
   .stale { color: #b9770e; }
-  .tx-head { display: flex; gap: 0.5rem; align-items: baseline; flex-wrap: wrap; }
-  .tx audio { width: 100%; margin-top: 0.4rem; }
-  .noise { opacity: 0.6; }
+  /* channel 16: one chat-style message per transmission, like the Telegram group */
+  .feed { padding: 0.6rem; border-radius: 12px; background: rgba(120,160,120,.14); }
+  .day-chip { text-align: center; margin: 0.6rem 0 0.4rem; }
+  .day-chip span { display: inline-block; font-size: 0.8rem; font-weight: 600;
+                   padding: 0.15rem 0.7rem; border-radius: 999px; background: rgba(0,0,0,.18); color: #fff; }
+  .msg { background: #fff; color: #111; border-radius: 14px; padding: 0.55rem 0.8rem 0.5rem;
+         margin: 0.45rem 0; box-shadow: 0 1px 1.5px rgba(0,0,0,.18); max-width: 34rem; }
+  @media (prefers-color-scheme: dark) { .msg { background: #212d3b; color: #f2f4f5; } }
+  .msg audio { width: 100%; height: 2.2rem; margin: 0.1rem 0 0.35rem; }
+  .msg-meta { font-size: 0.85rem; opacity: 0.7; font-variant-numeric: tabular-nums; }
+  .msg-text { font-size: 1.05rem; line-height: 1.5; margin: 0.45rem 0 0; white-space: pre-wrap;
+              overflow-wrap: anywhere; }
+  .msg-time { text-align: right; font-size: 0.75rem; opacity: 0.55; margin-top: 0.2rem; }
+  .msg .sev { font-size: 0.75rem; margin-right: 0.35rem; vertical-align: 1px; }
+  .msg.noise .msg-text { opacity: 0.55; }
+  .msg-warn { font-size: 0.85rem; margin: 0.4rem 0 0; opacity: 0.75; }
+  /* long transcripts start folded to six lines; "Show more" opens them */
+  .msg-text.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6;
+                    line-clamp: 6; overflow: hidden; }
+  .msg-more { background: none; border: 0; padding: 0; margin-top: 0.2rem; font: inherit;
+              font-size: 0.9rem; font-weight: 600; color: #2b8fc8; cursor: pointer; }
+  .msg-pos { font-size: 0.95rem; margin: 0.45rem 0 0; }
+  .msg-pos a { color: #2b8fc8; font-weight: 600; }
   table.tides { border-collapse: collapse; width: 100%; }
   table.tides td { padding: 0.2rem 0.4rem; border-bottom: 1px solid rgba(128,128,128,.2); }
   tr.next { font-weight: 700; }
@@ -38,40 +56,16 @@
 {% endblock %}
 {% block content %}
 <h2 style="margin-top:0.6rem">Marine 1</h2>
-<p class="jump muted"><a href="#ch16">Channel 16</a><a href="#tides">Tides</a><a href="#weather">Weather</a><a href="#cams">Webcams</a></p>
+<p class="jump muted"><a href="#tides">Tides</a><a href="#weather">Weather</a><a href="#ch16">Channel 16</a><a href="#cams">Webcams</a></p>
 
 {# -- warnings first: they are the reason to look at all ---------------- #}
 {% if forecast.value and forecast.value.alerts %}
   {% for a in forecast.value.alerts %}<div class="alert"><strong>NWS:</strong> {{ a }}</div>{% endfor %}
 {% endif %}
 
-<div class="now">
-  <div class="card">
-    <div class="muted">Next tide, {{ stations[station] }}</div>
-    {% if next_tide %}
-      <strong>{{ next_tide.kind }} {{ next_tide.at.strftime("%H:%M") }}</strong>, {{ "%.1f" | format(next_tide.height_ft) }} ft
-    {% else %}
-      <span class="muted">unavailable</span>
-    {% endif %}
-  </div>
-  <div class="card">
-    <div class="muted">Marine forecast{% if forecast.value and forecast.value.periods %}, {{ forecast.value.periods[0][0] }}{% endif %}</div>
-    {% if forecast.value and forecast.value.periods %}
-      {{ forecast.value.periods[0][1] }}
-    {% else %}
-      <span class="muted">unavailable</span>
-    {% endif %}
-  </div>
-</div>
-
-{# -- channel 16 ------------------------------------------------------- #}
-<h2 id="ch16">Channel 16</h2>
-<p class="muted">Newest first, updates by itself. The text is a computer's guess and is
-often wrong, especially names, numbers and positions: when it matters, play the recording.</p>
-<div id="feed">{% include "_feed.html" %}</div>
 
 {# -- tides ------------------------------------------------------------ #}
-<h2 id="tides">Tides</h2>
+<h2 id="tides">Tides, {{ stations[station] }}</h2>
 <form method="get" action="/marine1">
   {% if token %}<input type="hidden" name="token" value="{{ token }}">{% endif %}
   <select name="station" onchange="this.form.submit()">
@@ -126,6 +120,12 @@ often wrong, especially names, numbers and positions: when it matters, play the 
 <p class="muted">National Weather Service forecast for zone {{ zone }} (Northern Inland Waters
 including the San Juan Islands){% if forecast.value and forecast.value.updated %}, issued {{ forecast.value.updated }}{% endif %}.
 Fetched {{ forecast_age }}{% if forecast.stale %}, <span class="stale">could not refresh: showing the last copy</span>{% endif %}.</p>
+
+{# -- channel 16 ------------------------------------------------------- #}
+<h2 id="ch16">Channel 16</h2>
+<p class="muted">Newest first, updates by itself. The text is a computer's guess and is
+often wrong, especially names, numbers and positions: when it matters, play the recording.</p>
+<div id="feed" class="feed">{% include "_feed.html" %}</div>
 
 {# -- webcams: links, never embedded (owners' terms not checked) ------- #}
 <h2 id="cams">Webcams</h2>
@@ -230,6 +230,28 @@ Fetched {{ forecast_age }}{% if forecast.stale %}, <span class="stale">could not
   var tq = {{ tq | tojson }};
   var feed = document.getElementById("feed");
   var busy = false;
+  var opened = {};  // message ids someone expanded; kept across refreshes
+  // Fold long transcripts to six lines, with a "Show more" only where the
+  // text really is cut off (that depends on the screen width).
+  function foldLong() {
+    Array.prototype.forEach.call(feed.querySelectorAll(".msg"), function (m) {
+      var p = m.querySelector(".msg-text"), b = m.querySelector(".msg-more");
+      if (!p || !b) return;
+      if (opened[m.dataset.id]) { p.classList.remove("clamp"); b.hidden = false; b.textContent = "Show less"; return; }
+      p.classList.add("clamp");
+      b.hidden = p.scrollHeight <= p.clientHeight + 1;
+      b.textContent = "Show more";
+    });
+  }
+  feed.addEventListener("click", function (e) {
+    var b = e.target.closest(".msg-more");
+    if (!b) return;
+    var m = b.closest(".msg");
+    opened[m.dataset.id] = !opened[m.dataset.id];
+    foldLong();
+  });
+  window.addEventListener("resize", foldLong);
+  foldLong();
   function refresh() {
     // Don't swap the list out from under someone playing a recording.
     var playing = Array.prototype.some.call(feed.querySelectorAll("audio"),
@@ -237,7 +259,7 @@ Fetched {{ forecast_age }}{% if forecast.stale %}, <span class="stale">could not
     if (busy || playing) return;
     busy = true;
     fetch("/marine1/feed" + tq).then(function (r) { return r.ok ? r.text() : null; })
-      .then(function (html) { if (html !== null) feed.innerHTML = html; })
+      .then(function (html) { if (html !== null) { feed.innerHTML = html; foldLong(); } })
       .catch(function () { /* server restarting or offline: keep the old list */ })
       .finally(function () { busy = false; });
   }
