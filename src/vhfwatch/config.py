@@ -273,6 +273,7 @@ class DashboardConfig(_Section):
     cached, so the page still renders, with their age shown, offline."""
 
     feed_limit: int = 40  # transmissions shown, newest first
+    feed_visible: int = 8  # shown before "Show more"; the rest of feed_limit behind it
     # First entry is the default. All inside the response zone; ids from
     # NOAA's station list (api.tidesandcurrents.noaa.gov), checked 2026-11-21.
     tide_stations: list[TideStation] = [

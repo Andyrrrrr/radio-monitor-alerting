@@ -345,6 +345,7 @@ def create_app(cfg: Settings, conditions: Conditions | None = None) -> FastAPI:
             {
                 "chart": chart,
                 "feed": feed_items(request),
+                "visible": dash.feed_visible,
                 "tq": token_query(request),
                 "token": request.query_params.get("token", ""),
                 "stations": stations,
@@ -366,7 +367,9 @@ def create_app(cfg: Settings, conditions: Conditions | None = None) -> FastAPI:
         """The feed alone, for the page's live refresh."""
         authorize(request, None)
         return templates.TemplateResponse(
-            request, "_feed.html", {"feed": feed_items(request)}
+            request,
+            "_feed.html",
+            {"feed": feed_items(request), "visible": dash.feed_visible},
         )
 
     # -- write routes (the only ones) --------------------------------------
