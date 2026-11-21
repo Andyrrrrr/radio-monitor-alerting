@@ -16,6 +16,24 @@
   tr.next { font-weight: 700; }
   .jump a { margin-right: 0.8rem; }
   ul.cams { padding-left: 1.1rem; }
+  /* tide chart */
+  .tide-readout { display: flex; align-items: baseline; gap: 0.4rem 0.9rem; flex-wrap: wrap; margin: 0.4rem 0; }
+  .tide-readout .big { font-size: 2.3rem; font-weight: 300; line-height: 1; }
+  .tide-readout .big small { font-size: 1rem; }
+  #tide-chart { width: 100%; height: auto; display: block; touch-action: pan-y;
+                user-select: none; -webkit-user-select: none; cursor: ew-resize; }
+  #tide-chart:focus { outline: 2px solid #2b8fc8; outline-offset: 2px; }
+  .tide-area { fill: #3aa7e0; fill-opacity: 0.55; }
+  .tide-line { fill: none; stroke: #2b8fc8; stroke-width: 2.5; }
+  .tide-day { stroke: currentColor; stroke-opacity: 0.35; stroke-dasharray: 4 4; }
+  .tide-daylabel { font-size: 24px; fill: currentColor; opacity: 0.7; font-weight: 600; }
+  .tide-evlabel { font-size: 28px; fill: currentColor; font-weight: 600; }
+  .tide-evtime { font-size: 24px; fill: currentColor; opacity: 0.75; }
+  .tide-ev { fill: currentColor; }
+  .tide-now { stroke: currentColor; stroke-opacity: 0.25; }
+  .tide-cursor { stroke: #c9a800; stroke-width: 1.5; }
+  .tide-dot { fill: #f1e05a; stroke: #6b5d00; stroke-width: 2; }
+  details.tide-list { margin-top: 0.6rem; }
 </style>
 {% endblock %}
 {% block content %}
@@ -63,15 +81,32 @@ often wrong, especially names, numbers and positions: when it matters, play the 
   </select>
   <noscript><button>Show</button></noscript>
 </form>
+{% if chart %}
+  <div class="tide-readout" aria-live="polite">
+    <span class="big"><span id="tr-h">–</span><small> ft</small></span>
+    <span id="tr-t"></span>
+    <span id="tr-trend" class="muted"></span>
+    <button type="button" id="tr-now">Now</button>
+  </div>
+  <svg id="tide-chart" viewBox="0 0 800 420" tabindex="0" role="img"
+       aria-label="Tide curve for today and tomorrow. Drag, or use the arrow keys, to read the height at any time."></svg>
+  <p class="muted">Drag along the chart (or use the arrow keys) to read the height at any time.
+  Highs and lows are NOAA's predictions; the curve between them is an estimate
+  (NOAA's standard cosine method), good to a few tenths of a foot.</p>
+  <script>window.TIDE = {{ chart | tojson }};</script>
+{% endif %}
 {% if tide_days %}
-  <table class="tides">
-    {% for day, events in tide_days.items() %}
-      <tr><td colspan="3" class="muted">{{ day }}</td></tr>
-      {% for e in events %}
-        <tr class="{% if e.is_next %}next{% endif %}"><td>{{ e.time }}</td><td>{{ e.kind }}</td><td>{{ e.height_ft }} ft</td></tr>
+  <details class="tide-list" {% if not chart %}open{% endif %}>
+    <summary>Highs and lows as a list</summary>
+    <table class="tides">
+      {% for day, events in tide_days.items() %}
+        <tr><td colspan="3" class="muted">{{ day }}</td></tr>
+        {% for e in events %}
+          <tr class="{% if e.is_next %}next{% endif %}"><td>{{ e.time }}</td><td>{{ e.kind }}</td><td>{{ e.height_ft }} ft</td></tr>
+        {% endfor %}
       {% endfor %}
-    {% endfor %}
-  </table>
+    </table>
+  </details>
 {% else %}
   <p class="muted">Tides unavailable{% if tides.error %} ({{ tides.error }}){% endif %}.</p>
 {% endif %}
@@ -101,6 +136,94 @@ Fetched {{ forecast_age }}{% if forecast.stale %}, <span class="stale">could not
 </ul>
 
 <script>
+// Tide chart: drawn here from the server's points so it works with no
+// internet and no chart library. Times are shown in the station's timezone.
+(function () {
+  var T = window.TIDE, svg = document.getElementById("tide-chart");
+  if (!T || !svg || T.points.length < 2) return;
+  var NS = "http://www.w3.org/2000/svg";
+  var W = 800, H = 420, L = 8, R = 8, TOP = 84, BOT = 100;
+  var P = T.points, t0 = P[0][0], t1 = P[P.length - 1][0];
+  var hs = P.map(function (p) { return p[1]; });
+  var lo = Math.min.apply(null, hs), hi = Math.max.apply(null, hs);
+  var pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+  function x(t) { return L + (t - t0) / (t1 - t0) * (W - L - R); }
+  function y(h) { return TOP + (hi - h) / (hi - lo) * (H - TOP - BOT); }
+  function time(ms) { return new Date(ms).toLocaleTimeString("en-US", { timeZone: T.tz, hour: "numeric", minute: "2-digit" }); }
+  function day(ms) { return new Date(ms).toLocaleDateString("en-US", { timeZone: T.tz, weekday: "short", month: "short", day: "numeric" }); }
+  function el(tag, attrs, text) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    svg.appendChild(e); return e;
+  }
+  var line = P.map(function (p) { return x(p[0]).toFixed(1) + "," + y(p[1]).toFixed(1); });
+  el("path", { d: "M" + x(t0) + "," + (H - BOT) + " L" + line.join(" L") + " L" + x(t1) + "," + (H - BOT) + " Z", "class": "tide-area" });
+  el("path", { d: "M" + line.join(" L"), "class": "tide-line" });
+  var prev = null;
+  P.forEach(function (p) {
+    var d = day(p[0]);
+    if (d === prev) return;
+    var xx = x(p[0]);
+    if (xx > W - 120) return;  // a day that starts at the right edge has no room
+    if (prev !== null) el("line", { x1: xx, x2: xx, y1: 20, y2: H - BOT, "class": "tide-day" });
+    el("text", { x: xx + 6, y: H - 14, "class": "tide-daylabel" }, d.toUpperCase());
+    prev = d;
+  });
+  T.events.forEach(function (e) {
+    var xx = Math.min(Math.max(x(e[0]), 55), W - 55), yy = y(e[1]), high = e[2] === "High";
+    el("circle", { cx: x(e[0]), cy: yy, r: 3, "class": "tide-ev" });
+    el("text", { x: xx, y: high ? yy - 40 : yy + 36, "text-anchor": "middle", "class": "tide-evlabel" }, e[1].toFixed(1) + " ft");
+    el("text", { x: xx, y: high ? yy - 14 : yy + 62, "text-anchor": "middle", "class": "tide-evtime" }, time(e[0]));
+  });
+  if (T.now >= t0 && T.now <= t1) el("line", { x1: x(T.now), x2: x(T.now), y1: 20, y2: H - BOT, "class": "tide-now" });
+  var cursor = el("line", { y1: 20, y2: H - BOT, "class": "tide-cursor" });
+  var dot = el("circle", { r: 13, "class": "tide-dot" });
+  var outH = document.getElementById("tr-h"), outT = document.getElementById("tr-t"), outTr = document.getElementById("tr-trend");
+
+  function heightAt(t) {
+    var a = 0, b = P.length - 1;
+    while (b - a > 1) { var m = (a + b) >> 1; if (P[m][0] <= t) a = m; else b = m; }
+    var f = (t - P[a][0]) / (P[b][0] - P[a][0]);
+    return P[a][1] + (P[b][1] - P[a][1]) * Math.min(Math.max(f, 0), 1);
+  }
+  function span(ms) {
+    var mins = Math.round(ms / 60000), h = Math.floor(mins / 60), m = mins % 60;
+    return (h ? h + " h " : "") + m + " min";
+  }
+  var selected = T.now;
+  function select(t) {
+    selected = t = Math.min(Math.max(t, t0), t1);
+    var h = heightAt(t), xx = x(t), yy = y(h);
+    dot.setAttribute("cx", xx); dot.setAttribute("cy", yy);
+    cursor.setAttribute("x1", xx); cursor.setAttribute("x2", xx);
+    outH.textContent = h.toFixed(1);
+    outT.textContent = day(t) + ", " + time(t) + (Math.abs(t - T.now) < 5 * 60000 ? " (now)" : "");
+    var next = null;
+    for (var i = 0; i < T.events.length; i++) if (T.events[i][0] > t) { next = T.events[i]; break; }
+    var rising = heightAt(Math.min(t + 60000, t1)) >= h;
+    outTr.textContent = (rising ? "\u2191 Rising" : "\u2193 Falling") +
+      (next ? " \u00b7 " + next[2].toLowerCase() + " " + next[1].toFixed(1) + " ft in " + span(next[0] - t) : "");
+  }
+  function tAt(evt) {
+    var r = svg.getBoundingClientRect(), px = (evt.clientX - r.left) / r.width * W;
+    return t0 + (px - L) / (W - L - R) * (t1 - t0);
+  }
+  var dragging = false;
+  svg.addEventListener("pointerdown", function (e) { dragging = true; svg.setPointerCapture(e.pointerId); select(tAt(e)); });
+  svg.addEventListener("pointermove", function (e) { if (dragging) select(tAt(e)); });
+  ["pointerup", "pointercancel"].forEach(function (n) { svg.addEventListener(n, function () { dragging = false; }); });
+  svg.addEventListener("keydown", function (e) {
+    var step = (e.shiftKey ? 60 : 10) * 60000;
+    if (e.key === "ArrowRight") { select(selected + step); e.preventDefault(); }
+    if (e.key === "ArrowLeft") { select(selected - step); e.preventDefault(); }
+  });
+  document.getElementById("tr-now").addEventListener("click", function () { select(T.now); });
+  select(T.now);
+})();
+</script>
+
+<script>
 // New transmissions: the server's /live stream says when; then the feed is
 // re-fetched whole. If the stream drops, a slow poll keeps the page current.
 (function () {
@@ -115,6 +238,7 @@ Fetched {{ forecast_age }}{% if forecast.stale %}, <span class="stale">could not
     busy = true;
     fetch("/marine1/feed" + tq).then(function (r) { return r.ok ? r.text() : null; })
       .then(function (html) { if (html !== null) feed.innerHTML = html; })
+      .catch(function () { /* server restarting or offline: keep the old list */ })
       .finally(function () { busy = false; });
   }
   if (window.EventSource) {
