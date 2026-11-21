@@ -29,9 +29,6 @@
               font-size: 0.9rem; font-weight: 600; color: #2b8fc8; cursor: pointer; }
   .msg-pos { font-size: 0.95rem; margin: 0.45rem 0 0; }
   .msg-pos a { color: #2b8fc8; font-weight: 600; }
-  table.tides { border-collapse: collapse; width: 100%; }
-  table.tides td { padding: 0.2rem 0.4rem; border-bottom: 1px solid rgba(128,128,128,.2); }
-  tr.next { font-weight: 700; }
   .jump a { margin-right: 0.8rem; }
   ul.cams { padding-left: 1.1rem; }
   /* tide chart */
@@ -51,7 +48,6 @@
   .tide-now { stroke: currentColor; stroke-opacity: 0.25; }
   .tide-cursor { stroke: #c9a800; stroke-width: 1.5; }
   .tide-dot { fill: #f1e05a; stroke: #6b5d00; stroke-width: 2; }
-  details.tide-list { margin-top: 0.6rem; }
 </style>
 {% endblock %}
 {% block content %}
@@ -84,34 +80,19 @@
   </div>
   <svg id="tide-chart" viewBox="0 0 800 420" tabindex="0" role="img"
        aria-label="Tide curve for today and tomorrow. Drag, or use the arrow keys, to read the height at any time."></svg>
-  <p class="muted">Drag along the chart (or use the arrow keys) to read the height at any time.
-  Highs and lows are NOAA's predictions; the curve between them is an estimate
-  (NOAA's standard cosine method), good to a few tenths of a foot.</p>
   <script>window.TIDE = {{ chart | tojson }};</script>
-{% endif %}
-{% if tide_days %}
-  <details class="tide-list" {% if not chart %}open{% endif %}>
-    <summary>Highs and lows as a list</summary>
-    <table class="tides">
-      {% for day, events in tide_days.items() %}
-        <tr><td colspan="3" class="muted">{{ day }}</td></tr>
-        {% for e in events %}
-          <tr class="{% if e.is_next %}next{% endif %}"><td>{{ e.time }}</td><td>{{ e.kind }}</td><td>{{ e.height_ft }} ft</td></tr>
-        {% endfor %}
-      {% endfor %}
-    </table>
-  </details>
 {% else %}
   <p class="muted">Tides unavailable{% if tides.error %} ({{ tides.error }}){% endif %}.</p>
 {% endif %}
-<p class="muted">NOAA predictions (not measured), feet above mean lower low water, station
-{{ station }}. Fetched {{ tides_age }}{% if tides.stale %}, <span class="stale">could not refresh: showing the last copy</span>{% endif %}.</p>
+{# Kept short, but kept: the reader must know which parts are estimates. #}
+<p class="muted">NOAA predictions, feet above mean lower low water, station {{ station }};
+heights between the highs and lows are estimated. Fetched {{ tides_age }}{% if tides.stale %}, <span class="stale">could not refresh: showing the last copy</span>{% endif %}.</p>
 
 {# -- weather ---------------------------------------------------------- #}
 <h2 id="weather">Marine weather</h2>
 {% if forecast.value %}
   {% if not forecast.value.alerts %}<p class="muted">No active NWS warnings for this zone.</p>{% endif %}
-  {% for name, text in forecast.value.periods[:6] %}
+  {% for name, text in forecast_now %}
     <p><strong>{{ name }}:</strong> {{ text }}</p>
   {% endfor %}
 {% else %}
