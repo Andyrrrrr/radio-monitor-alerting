@@ -493,3 +493,11 @@ def test_stale_tides_still_say_so(cfg: Settings) -> None:
         clock.now += timedelta(minutes=5)
         html = c.get("/marine1").text
     assert "Tides could not refresh" in html
+
+
+def test_alerts_box_hides_once_on_with_a_link_to_reopen_it(cfg: Settings) -> None:
+    with client(cfg) as c:
+        html = c.get("/marine1").text
+    assert 'id="alerts-card"' in html and 'id="alerts-link"' in html
+    assert "Alert settings for this phone" in html
+    assert "card.hidden = true; link.hidden = false;" in html  # alerts on: box hidden

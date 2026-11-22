@@ -131,6 +131,9 @@ often wrong, especially names, numbers and positions: when it matters, play the 
 <div id="feed" class="feed">{% include "_feed.html" %}</div>
 <button type="button" id="feed-more" class="feed-more" hidden></button>
 
+{# Once alerts are on, the setup box hides; this brings it back. #}
+<p class="muted" id="alerts-link" hidden><a href="#" id="alerts-settings">Alert settings for this phone</a></p>
+
 {# -- webcams: links, never embedded (owners' terms not checked) ------- #}
 <h2 id="cams">Webcams</h2>
 <ul class="cams">
@@ -298,13 +301,14 @@ often wrong, especially names, numbers and positions: when it matters, play the 
   var btnOn = document.getElementById("alerts-on"), btnTest = document.getElementById("alerts-test"),
       btnOff = document.getElementById("alerts-off");
   var tq = {{ tq | tojson }}, secureUrl = {{ push_url | tojson }};
+  var link = document.getElementById("alerts-link");
   function show(html, on, test, off) {
-    card.hidden = false; status.innerHTML = html;
+    card.hidden = false; link.hidden = true; status.innerHTML = html;
     btnOn.hidden = !on; btnTest.hidden = !test; btnOff.hidden = !off;
   }
   function esc(t) { var d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
   if (!window.isSecureContext) {
-    if (secureUrl) show('For alerts on your phone, open <a href="' + secureUrl + '">' + esc(secureUrl) + "</a> (needs Tailscale).");
+    if (secureUrl && /iPhone|iPad|Android/.test(navigator.userAgent)) show('For alerts on your phone, open <a href="' + secureUrl + '">' + esc(secureUrl) + "</a> (needs Tailscale).");
     return;
   }
   if (!("serviceWorker" in navigator)) { show("This browser can't receive alerts."); return; }
@@ -333,12 +337,16 @@ often wrong, especially names, numbers and positions: when it matters, play the 
   }
   function refresh() {
     navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (sub) {
-      if (sub && Notification.permission === "granted") show("Alerts are <strong>on</strong> for this phone. Only urgent calls ring.", false, true, true);
+      if (sub && Notification.permission === "granted") {
+        if (expanded) show("Alerts are <strong>on</strong> for this phone. Only urgent calls ring.", false, true, true);
+        else { card.hidden = true; link.hidden = false; }
+      }
       else if (Notification.permission === "denied") show("Notifications are blocked for Marine 1 on this device. Allow them in its settings (on an iPhone: Settings, Notifications, Marine 1), then reopen this page.");
       else show("Get a notification on this phone when an urgent call comes in.", true, false, false);
     });
   }
   btnOn.addEventListener("click", function () {
+    expanded = true;  // keep the box open right after turning on, to test
     show("Asking for permission…");
     Notification.requestPermission().then(function (perm) {
       if (perm !== "granted") { refresh(); return null; }
@@ -365,6 +373,10 @@ often wrong, especially names, numbers and positions: when it matters, play the 
       if (!sub) return null;
       return post("/push/unsubscribe", { endpoint: sub.endpoint }).then(function () { return sub.unsubscribe(); });
     }).then(refresh).catch(refresh);
+  });
+  var expanded = false;  // the box was reopened from the small link
+  document.getElementById("alerts-settings").addEventListener("click", function (e) {
+    e.preventDefault(); expanded = true; refresh(); card.scrollIntoView({ block: "center" });
   });
   refresh();
 })();
